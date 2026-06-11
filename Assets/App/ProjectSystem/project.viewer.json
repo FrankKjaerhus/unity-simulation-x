@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "schemaVersion": 1,
+  "scene": {
+    "objects": []
+  },
+  "viewSettings": {
+    "activeViewMode": "Perspective3D",
+    "cameraBookmarks": []
+  },
+  "runtime": {
+    "bindings": []
+  },
+  "diagnostics": []
+}

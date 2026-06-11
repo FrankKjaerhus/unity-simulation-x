@@ -1,0 +1,391 @@
+.shell-root {
+    flex-grow: 1;
+    background-color: rgba(0, 0, 0, 0);
+    color: rgb(224, 224, 224);
+}
+
+.toolbar {
+    height: 40px;
+    flex-direction: row;
+    align-items: center;
+    background-color: rgb(43, 43, 43);
+    border-bottom-width: 1px;
+    border-bottom-color: rgb(18, 18, 18);
+}
+
+.toolbar-brand {
+    width: 170px;
+    height: 40px;
+    justify-content: center;
+    padding-left: 10px;
+}
+
+.toolbar-title {
+    unity-font-style: bold;
+    font-size: 12px;
+    color: rgb(235, 235, 235);
+}
+
+.toolbar-actions {
+    flex-grow: 1;
+    flex-direction: row;
+    align-items: center;
+}
+
+.toolbar-group {
+    flex-direction: row;
+    align-items: center;
+    margin-left: 4px;
+    margin-right: 4px;
+}
+
+.toolbar-separator {
+    width: 1px;
+    height: 24px;
+    margin-left: 6px;
+    margin-right: 6px;
+    background-color: rgb(70, 70, 70);
+}
+
+.toolbar-button {
+    height: 30px;
+    min-width: 34px;
+    margin-left: 2px;
+    margin-right: 2px;
+    padding-left: 8px;
+    padding-right: 8px;
+    background-color: rgb(56, 56, 56);
+    border-color: rgb(83, 83, 83);
+    border-radius: 4px;
+    color: rgb(230, 230, 230);
+    font-size: 11px;
+}
+
+.toolbar-button:hover {
+    background-color: rgb(70, 70, 70);
+    border-color: rgb(105, 105, 105);
+}
+
+.tool-button-active {
+    background-color: rgb(45, 94, 145);
+    border-color: rgb(92, 157, 220);
+}
+
+.main-content {
+    flex-grow: 1;
+    flex-direction: row;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.side-panel {
+    width: 300px;
+    flex-direction: column;
+    background-color: rgb(38, 38, 38);
+    border-color: rgb(18, 18, 18);
+    border-width: 1px;
+}
+
+.side-panel-collapsed {
+    width: 28px;
+}
+
+.side-panel-collapsed .panel {
+    display: none;
+}
+
+.side-panel-collapsed .panel-title {
+    display: none;
+}
+
+.panel-header {
+    height: 32px;
+    flex-direction: row;
+    align-items: center;
+    padding-left: 8px;
+    padding-right: 4px;
+    background-color: rgb(48, 48, 48);
+    border-bottom-width: 1px;
+    border-bottom-color: rgb(24, 24, 24);
+}
+
+.panel-title {
+    flex-grow: 1;
+    unity-font-style: bold;
+    font-size: 12px;
+    color: rgb(230, 230, 230);
+}
+
+.panel-hint {
+    color: rgb(165, 165, 165);
+    font-size: 10px;
+    margin-bottom: 6px;
+}
+
+.collapse-button {
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    padding-left: 0;
+    padding-right: 0;
+    background-color: rgb(58, 58, 58);
+    border-color: rgb(82, 82, 82);
+    border-radius: 3px;
+    color: rgb(220, 220, 220);
+}
+
+.panel {
+    padding: 8px;
+    flex-direction: column;
+}
+
+.hierarchy-panel {
+    flex-grow: 1;
+}
+
+.property-row {
+    margin-bottom: 4px;
+}
+
+.property-row > Label {
+    color: rgb(210, 210, 210);
+    font-size: 11px;
+}
+
+.property-label {
+    color: rgb(200, 200, 200);
+    font-size: 11px;
+}
+
+.property-value {
+    color: rgb(230, 230, 230);
+    font-size: 11px;
+}
+
+.search-field {
+    margin-bottom: 6px;
+}
+
+.search-field .unity-base-field__label {
+    color: rgb(200, 200, 200);
+    min-width: 48px;
+}
+
+.search-field .unity-base-text-field__input,
+.search-field .unity-text-field__input {
+    background-color: rgb(32, 32, 32);
+    border-color: rgb(62, 62, 62);
+    border-width: 1px;
+    border-radius: 3px;
+    color: rgb(235, 235, 235);
+}
+
+.editor-field {
+    margin-top: 2px;
+}
+
+.editor-field .unity-base-field__label {
+    color: rgb(200, 200, 200);
+    min-width: 56px;
+}
+
+.editor-field .unity-base-text-field__input,
+.editor-field .unity-text-field__input,
+.editor-field .unity-base-popup-field__input,
+.editor-field .unity-popup-field__input,
+.editor-field .unity-composite-field__field,
+.editor-field .unity-vector3-field__input {
+    background-color: rgb(32, 32, 32);
+    border-color: rgb(62, 62, 62);
+    border-width: 1px;
+    border-radius: 3px;
+    color: rgb(235, 235, 235);
+}
+
+.editor-field .unity-toggle__input {
+    background-color: rgb(42, 42, 42);
+    border-color: rgb(70, 70, 70);
+}
+
+.editor-field .unity-toggle__checkmark {
+    border-color: rgb(120, 170, 230);
+}
+
+.hierarchy-actions .unity-base-field__label {
+    color: rgb(200, 200, 200);
+}
+
+.hierarchy-actions .unity-base-popup-field__input {
+    background-color: rgb(32, 32, 32);
+    border-color: rgb(62, 62, 62);
+    color: rgb(235, 235, 235);
+}
+
+.hierarchy-tree {
+    flex-grow: 1;
+    min-height: 200px;
+    background-color: rgb(32, 32, 32);
+    border-color: rgb(52, 52, 52);
+    border-width: 1px;
+}
+
+.hierarchy-row {
+    min-height: 24px;
+    flex-direction: row;
+    align-items: center;
+    padding-left: 3px;
+    padding-right: 3px;
+}
+
+.hierarchy-row:hover {
+    background-color: rgb(46, 46, 46);
+}
+
+.hierarchy-row-selected {
+    background-color: rgb(56, 104, 160);
+}
+
+.hierarchy-row-drag-target {
+    background-color: rgb(73, 115, 68);
+}
+
+.hierarchy-icon {
+    width: 20px;
+}
+
+.hierarchy-name {
+    flex-grow: 1;
+}
+
+.hierarchy-name .unity-base-text-field__input,
+.hierarchy-name .unity-text-field__input {
+    background-color: rgb(32, 32, 32);
+    border-color: rgb(62, 62, 62);
+    color: rgb(235, 235, 235);
+    min-height: 18px;
+}
+
+.hierarchy-actions {
+    margin-top: 6px;
+}
+
+.secondary-button {
+    height: 24px;
+    margin-top: 4px;
+}
+
+.danger-button {
+    height: 24px;
+    margin-top: 4px;
+    background-color: rgb(92, 45, 45);
+    border-color: rgb(130, 68, 68);
+}
+
+.library-panel {
+    max-height: 260px;
+    border-top-width: 1px;
+    border-top-color: rgb(24, 24, 24);
+}
+
+.library-panel-hidden {
+    display: none;
+}
+
+.library-scroll {
+    flex-grow: 1;
+}
+
+.library-grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.library-tile {
+    width: 82px;
+    height: 70px;
+    margin: 3px;
+    padding: 6px;
+    align-items: center;
+    justify-content: center;
+    background-color: rgb(50, 50, 50);
+    border-color: rgb(76, 76, 76);
+    border-width: 1px;
+    border-radius: 5px;
+}
+
+.library-tile:hover {
+    background-color: rgb(63, 63, 63);
+    border-color: rgb(96, 150, 210);
+}
+
+.library-tile-icon {
+    font-size: 19px;
+    unity-font-style: bold;
+    color: rgb(145, 170, 255);
+}
+
+.library-tile-label {
+    margin-top: 4px;
+    font-size: 10px;
+    color: rgb(230, 230, 230);
+    -unity-text-align: middle-center;
+}
+
+.viewport-root {
+    flex-grow: 1;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.viewport-placeholder {
+    flex-grow: 1;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0);
+    picking-mode: ignore;
+}
+
+.viewport-label {
+    color: rgba(140, 140, 140, 0);
+}
+
+.viewport-overlay {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    picking-mode: ignore;
+}
+
+.viewport-overlay-controls {
+    flex-direction: row;
+    picking-mode: position;
+    background-color: rgba(30, 30, 30, 0.82);
+    border-color: rgb(70, 70, 70);
+    border-width: 1px;
+    border-radius: 4px;
+    padding: 3px;
+}
+
+.overlay-button {
+    height: 28px;
+    margin-left: 2px;
+    margin-right: 2px;
+    padding-left: 7px;
+    padding-right: 7px;
+    background-color: rgb(52, 52, 52);
+    border-color: rgb(78, 78, 78);
+    border-radius: 3px;
+    color: rgb(230, 230, 230);
+    font-size: 11px;
+}
+
+.overlay-button-active {
+    background-color: rgb(45, 94, 145);
+    border-color: rgb(92, 157, 220);
+}
+
+.properties-panel {
+    flex-grow: 1;
+}
+
+.properties-scroll {
+    flex-grow: 1;
+}

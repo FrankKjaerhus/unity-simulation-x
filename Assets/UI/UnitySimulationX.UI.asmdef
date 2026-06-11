@@ -1,0 +1,19 @@
+{
+    "name": "UnitySimulationX.UI",
+    "rootNamespace": "UnitySimulationX.UI",
+    "references": [
+        "UnitySimulationX.Core",
+        "UnitySimulationX.SceneModel",
+        "UnitySimulationX.Viewer",
+        "UnitySimulationX.Import"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

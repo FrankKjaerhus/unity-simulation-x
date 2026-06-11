@@ -1,0 +1,25 @@
+{
+    "name": "UnitySimulationX.Tests.PlayMode",
+    "rootNamespace": "UnitySimulationX.Tests.PlayMode",
+    "references": [
+        "UnitySimulationX.Core",
+        "UnitySimulationX.SceneModel",
+        "UnitySimulationX.Viewer",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

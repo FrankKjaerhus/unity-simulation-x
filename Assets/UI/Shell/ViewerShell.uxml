@@ -1,0 +1,87 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:VisualElement name="shell-root" class="shell-root">
+        <ui:VisualElement name="toolbar" class="toolbar">
+            <ui:VisualElement class="toolbar-brand">
+                <ui:Label text="Unity Simulation X" class="toolbar-title" />
+            </ui:VisualElement>
+
+            <ui:VisualElement name="toolbar-actions" class="toolbar-actions">
+                <ui:VisualElement class="toolbar-group">
+                    <ui:Button name="toolbar-load" text="folder_open Load" tooltip="Load project" class="toolbar-button icon-button" />
+                    <ui:Button name="toolbar-save" text="save Save" tooltip="Save project" class="toolbar-button icon-button" />
+                </ui:VisualElement>
+
+                <ui:VisualElement class="toolbar-separator" />
+
+                <ui:VisualElement class="toolbar-group">
+                    <ui:Button name="toolbar-import" text="upload_file Import 3D" tooltip="Import GLB, OBJ, or STL" class="toolbar-button icon-button" />
+                </ui:VisualElement>
+
+                <ui:VisualElement class="toolbar-separator" />
+
+                <ui:VisualElement class="toolbar-group">
+                    <ui:Button name="tool-select" text="near_me Select" tooltip="Select objects" class="toolbar-button icon-button tool-button tool-button-active" />
+                    <ui:Button name="tool-move" text="open_with Move" tooltip="Move selected objects" class="toolbar-button icon-button tool-button" />
+                    <ui:Button name="tool-measure" text="straighten Measure" tooltip="Measure point-to-point distance" class="toolbar-button icon-button tool-button" />
+                    <ui:Button name="tool-insert" text="category Primitives" tooltip="Show primitive library" class="toolbar-button icon-button tool-button" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="main-content" class="main-content">
+            <ui:VisualElement name="left-panel" class="side-panel left-panel">
+                <ui:VisualElement class="panel-header">
+                    <ui:Label text="Hierarchy" class="panel-title" />
+                    <ui:Button name="left-panel-collapse" text="&lt;" tooltip="Collapse left sidebar" class="collapse-button" />
+                </ui:VisualElement>
+
+                <ui:VisualElement name="hierarchy-panel" class="panel hierarchy-panel">
+                    <ui:TextField name="hierarchy-search" label="Search" class="search-field" />
+                    <ui:ScrollView name="hierarchy-tree" class="hierarchy-tree">
+                        <ui:VisualElement name="hierarchy-tree-content" />
+                    </ui:ScrollView>
+                    <ui:VisualElement class="hierarchy-actions">
+                        <ui:DropdownField name="reparent-target" label="Parent" choices="(Root)" />
+                        <ui:Button name="reparent-button" text="Reparent" tooltip="Move selected object under chosen parent" class="secondary-button" />
+                        <ui:Button name="delete-button" text="Delete" tooltip="Delete selected objects" class="danger-button" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <ui:VisualElement name="library-section" class="panel library-panel library-panel-hidden">
+                    <ui:Label text="Primitive Library" class="panel-title" />
+                    <ui:Label text="Shown when the Primitives tool is active." class="panel-hint" />
+                    <ui:ScrollView name="primitive-library-scroll" class="library-scroll">
+                        <ui:VisualElement name="primitive-library-content" class="library-grid" />
+                    </ui:ScrollView>
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement name="viewport-root" class="viewport-root">
+                <ui:VisualElement name="viewport-placeholder" class="viewport-placeholder">
+                    <ui:Label text="3D viewport" class="viewport-label" />
+                </ui:VisualElement>
+
+                <ui:VisualElement name="viewport-overlay" class="viewport-overlay">
+                    <ui:VisualElement name="viewport-overlay-controls" class="viewport-overlay-controls">
+                        <ui:Button name="grid-toggle" text="grid_on Grid" tooltip="Show or hide the floor grid" class="overlay-button icon-button" />
+                        <ui:Button name="view-2d" text="crop_square 2D" tooltip="Top orthographic view" class="overlay-button icon-button" />
+                        <ui:Button name="view-3d" text="view_in_ar 3D" tooltip="Perspective 3D view" class="overlay-button icon-button overlay-button-active" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement name="right-panel" class="side-panel right-panel">
+                <ui:VisualElement class="panel-header">
+                    <ui:Label text="Properties" class="panel-title" />
+                    <ui:Button name="right-panel-collapse" text="&gt;" tooltip="Collapse right sidebar" class="collapse-button" />
+                </ui:VisualElement>
+
+                <ui:VisualElement name="properties-panel" class="panel properties-panel">
+                    <ui:ScrollView name="properties-scroll" class="properties-scroll">
+                        <ui:VisualElement name="properties-fields" />
+                    </ui:ScrollView>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

@@ -1,0 +1,29 @@
+{
+    "name": "UnitySimulationX.Tests.EditMode",
+    "rootNamespace": "UnitySimulationX.Tests.EditMode",
+    "references": [
+        "UnitySimulationX.Core",
+        "UnitySimulationX.App",
+        "UnitySimulationX.Import",
+        "UnitySimulationX.SceneModel",
+        "UnitySimulationX.Viewer",
+        "UnitySimulationX.UI",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
