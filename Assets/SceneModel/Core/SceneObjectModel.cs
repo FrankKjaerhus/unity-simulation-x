@@ -11,7 +11,6 @@ namespace UnitySimulationX.SceneModel
     {
         public string Id { get; set; }
         public string Name { get; set; }
-        public SceneObjectType Type { get; set; }
         public SceneObjectTypeId TypeId { get; set; } = SceneObjectTypeIds.Group;
         public string AssetId { get; set; }
 
@@ -38,7 +37,6 @@ namespace UnitySimulationX.SceneModel
             {
                 Id = Id,
                 Name = Name,
-                Type = Type,
                 TypeId = TypeId,
                 AssetId = AssetId,
                 ParentId = ParentId,

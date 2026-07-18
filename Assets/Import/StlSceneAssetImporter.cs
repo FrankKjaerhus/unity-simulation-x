@@ -24,7 +24,7 @@ namespace UnitySimulationX.Import
                 {
                     Id = System.Guid.NewGuid().ToString("N"),
                     Name = Path.GetFileNameWithoutExtension(filePath),
-                    Type = SceneObjectType.ImportedAsset
+                    TypeId = SceneObjectTypeIds.ImportedModel
                 },
                 Bounds = CalculateBounds(mesh.Vertices)
             };

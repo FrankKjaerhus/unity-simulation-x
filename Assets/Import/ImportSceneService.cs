@@ -45,7 +45,6 @@ namespace UnitySimulationX.Import
             {
                 Id = result.RootObject.Id,
                 Name = result.RootObject.Name,
-                Type = result.RootObject.Type,
                 TypeId = result.RootObject.TypeId,
                 ParentId = result.RootObject.ParentId,
                 Transform = result.RootObject.Transform?.Clone() ?? new TransformData(),

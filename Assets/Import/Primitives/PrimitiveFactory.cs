@@ -21,7 +21,6 @@ namespace UnitySimulationX.Import
             {
                 Id = Guid.NewGuid().ToString("N"),
                 Name = string.IsNullOrWhiteSpace(settings.Name) ? type.ToString() : settings.Name,
-                Type = SceneObjectType.Primitive,
                 TypeId = SceneObjectTypeIds.Primitive,
                 ParentId = settings.ParentId,
                 Transform = new TransformData

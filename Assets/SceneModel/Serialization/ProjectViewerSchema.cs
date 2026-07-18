@@ -28,6 +28,7 @@ namespace UnitySimulationX.SceneModel.Serialization
         public string id;
         public string name;
         public string type;
+        public string typeId;
         public string parentId;
         public List<string> childrenIds = new();
         public TransformData transform = new();

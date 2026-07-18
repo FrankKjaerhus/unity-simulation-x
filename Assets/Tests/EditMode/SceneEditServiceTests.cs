@@ -52,7 +52,6 @@ namespace UnitySimulationX.Tests.EditMode
             {
                 Id = id,
                 Name = id,
-                Type = SceneObjectType.Primitive,
                 TypeId = SceneObjectTypeIds.Primitive
             };
 
@@ -63,14 +62,12 @@ namespace UnitySimulationX.Tests.EditMode
             {
                 Id = "root",
                 Name = "Root",
-                Type = SceneObjectType.MachineFrame,
                 TypeId = SceneObjectTypeIds.Group
             });
             registry.Add(new SceneObjectModel
             {
                 Id = "child",
                 Name = "Child",
-                Type = SceneObjectType.Primitive,
                 TypeId = SceneObjectTypeIds.Primitive,
                 ParentId = "root"
             });

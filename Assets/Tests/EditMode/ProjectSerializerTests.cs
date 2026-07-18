@@ -16,13 +16,13 @@ namespace UnitySimulationX.Tests.EditMode
             {
                 Id = "root",
                 Name = "Root",
-                Type = SceneObjectType.MachineFrame
+                TypeId = SceneObjectTypeIds.Group
             };
             var child = new SceneObjectModel
             {
                 Id = "child",
                 Name = "Child",
-                Type = SceneObjectType.Primitive,
+                TypeId = SceneObjectTypeIds.Primitive,
                 ParentId = root.Id,
                 Transform = new TransformData { Position = new Vector3(1f, 2f, 3f), Scale = Vector3.one }
             };

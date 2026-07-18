@@ -197,7 +197,6 @@ namespace UnitySimulationX.Editing
             {
                 Id = draft.Id,
                 Name = draft.Name,
-                Type = draft.Type,
                 TypeId = draft.TypeId,
                 ParentId = draft.ParentId,
                 Transform = draft.Transform?.Clone() ?? new TransformData(),

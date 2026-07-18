@@ -8,7 +8,6 @@ namespace UnitySimulationX.Editing
         public string Id { get; set; }
         public string Name { get; set; }
         public SceneObjectTypeId TypeId { get; set; } = SceneObjectTypeIds.Group;
-        public SceneObjectType Type { get; set; }
         public string ParentId { get; set; }
         public TransformData Transform { get; set; } = new();
         public bool Visible { get; set; } = true;

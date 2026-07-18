@@ -24,8 +24,8 @@ namespace UnitySimulationX.UI.Properties
                 Key = "type",
                 DisplayName = "Type",
                 Category = "Common",
-                ValueType = typeof(SceneObjectType),
-                Value = obj.Type,
+                ValueType = typeof(string),
+                Value = obj.TypeId.Value,
                 IsReadOnly = true
             };
 

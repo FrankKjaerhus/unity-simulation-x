@@ -39,7 +39,6 @@ namespace UnitySimulationX.Tests.PlayMode
             {
                 Id = "sel1",
                 Name = "Selectable",
-                Type = SceneObjectType.Primitive,
                 TypeId = SceneObjectTypeIds.Primitive,
                 PrimitiveMeshTypeKey = "Cube"
             };
@@ -78,7 +77,6 @@ namespace UnitySimulationX.Tests.PlayMode
             {
                 Id = "sel2",
                 Name = "Second",
-                Type = SceneObjectType.Primitive,
                 TypeId = SceneObjectTypeIds.Primitive,
                 PrimitiveMeshTypeKey = "Sphere"
             };

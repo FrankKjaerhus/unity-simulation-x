@@ -203,7 +203,6 @@ namespace UnitySimulationX.App
             {
                 Id = System.Guid.NewGuid().ToString("N"),
                 Name = "Scene",
-                Type = SceneObjectType.MachineFrame,
                 TypeId = SceneObjectTypeIds.Group
             };
 
@@ -233,7 +232,6 @@ namespace UnitySimulationX.App
                 {
                     Id = System.Guid.NewGuid().ToString("N"),
                     Name = candidate.name,
-                    Type = SceneObjectType.ImportedAsset,
                     TypeId = SceneObjectTypeIds.ImportedModel,
                     ParentId = _sceneRootModelId,
                     Transform = new TransformData

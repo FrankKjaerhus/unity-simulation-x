@@ -94,7 +94,6 @@ namespace UnitySimulationX.Tests.EditMode
             {
                 Id = id,
                 Name = id,
-                Type = SceneObjectType.Primitive,
                 TypeId = SceneObjectTypeIds.Primitive
             };
         }

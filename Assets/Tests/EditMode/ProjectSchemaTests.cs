@@ -26,7 +26,7 @@ namespace UnitySimulationX.Tests.EditMode
             {
                 id = "test",
                 name = "Test",
-                type = SceneObjectType.Primitive.ToString()
+                typeId = SceneObjectTypeIds.Primitive.Value
             });
 
             var json = JsonUtility.ToJson(doc, prettyPrint: true);

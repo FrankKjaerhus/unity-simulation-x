@@ -35,7 +35,6 @@ namespace UnitySimulationX.Tests.EditMode
             {
                 Id = "obj1",
                 Name = "Cube",
-                Type = SceneObjectType.Primitive,
                 TypeId = SceneObjectTypeIds.Primitive,
                 PrimitiveMeshTypeKey = "Cube"
             };
@@ -57,7 +56,6 @@ namespace UnitySimulationX.Tests.EditMode
             {
                 Id = "obj2",
                 Name = "Sphere",
-                Type = SceneObjectType.Primitive,
                 TypeId = SceneObjectTypeIds.Primitive,
                 PrimitiveMeshTypeKey = "Sphere"
             };
@@ -78,7 +76,6 @@ namespace UnitySimulationX.Tests.EditMode
             {
                 Id = "existing",
                 Name = "Existing",
-                Type = SceneObjectType.ImportedAsset,
                 TypeId = SceneObjectTypeIds.ImportedModel
             };
             var existing = new GameObject("Existing");
@@ -101,7 +98,6 @@ namespace UnitySimulationX.Tests.EditMode
             {
                 Id = "obj3",
                 Name = "Moved",
-                Type = SceneObjectType.Primitive,
                 TypeId = SceneObjectTypeIds.Primitive,
                 PrimitiveMeshTypeKey = "Cube",
                 Transform = new TransformData { Position = Vector3.zero }
@@ -123,7 +119,6 @@ namespace UnitySimulationX.Tests.EditMode
             {
                 Id = "obj5",
                 Name = "Colored",
-                Type = SceneObjectType.Primitive,
                 TypeId = SceneObjectTypeIds.Primitive,
                 PrimitiveMeshTypeKey = "Cube",
                 Transform = new TransformData { Position = Vector3.zero }
@@ -150,7 +145,6 @@ namespace UnitySimulationX.Tests.EditMode
             {
                 Id = "obj4",
                 Name = "Temp",
-                Type = SceneObjectType.Primitive,
                 TypeId = SceneObjectTypeIds.Primitive,
                 PrimitiveMeshTypeKey = "Cube"
             };

@@ -136,7 +136,7 @@ namespace UnitySimulationX.UI.Hierarchy
             row.style.flexDirection = FlexDirection.Row;
             row.style.alignItems = Align.Center;
 
-            var icon = new Label(GetIcon(model.Type));
+            var icon = new Label(GetIcon(model.TypeId));
             icon.AddToClassList("hierarchy-icon");
 
             var nameField = new TextField { value = model.Name };
@@ -257,19 +257,18 @@ namespace UnitySimulationX.UI.Hierarchy
             Rebuild();
         }
 
-        static string GetIcon(SceneObjectType type)
+        static string GetIcon(SceneObjectTypeId typeId)
         {
-            return type switch
-            {
-                SceneObjectType.Primitive => "PR",
-                SceneObjectType.Robot => "RB",
-                SceneObjectType.Shuttle => "SH",
-                SceneObjectType.Station => "ST",
-                SceneObjectType.Sensor => "SE",
-                SceneObjectType.SafetyZone => "SZ",
-                SceneObjectType.ImportedAsset => "3D",
-                _ => "OB"
-            };
+            if (typeId.Equals(SceneObjectTypeIds.Primitive))
+                return "PR";
+            if (typeId.Equals(SceneObjectTypeIds.ImportedModel))
+                return "3D";
+            if (typeId.Equals(SceneObjectTypeIds.Group))
+                return "OB";
+            if (typeId.Equals(SceneObjectTypeIds.MissingAsset))
+                return "??";
+
+            return "OB";
         }
 
         static bool IsInteractiveTarget(IEventHandler target)

@@ -52,7 +52,7 @@ namespace UnitySimulationX.Import
                 {
                     Id = Guid.NewGuid().ToString("N"),
                     Name = root.name,
-                    Type = SceneObjectType.ImportedAsset
+                    TypeId = SceneObjectTypeIds.ImportedModel
                 },
                 ImportedGameObject = root,
                 Bounds = CalculateBounds(root)

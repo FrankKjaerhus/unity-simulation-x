@@ -84,7 +84,8 @@ namespace UnitySimulationX.App.ProjectSystem
             {
                 id = model.Id,
                 name = model.Name,
-                type = model.Type.ToString(),
+                typeId = model.TypeId.Value,
+                type = model.TypeId.Value,
                 parentId = model.ParentId,
                 childrenIds = registry.GetChildrenIds(model.Id).ToList(),
                 transform = model.Transform?.Clone() ?? new TransformData(),
@@ -100,7 +101,9 @@ namespace UnitySimulationX.App.ProjectSystem
             {
                 Id = string.IsNullOrWhiteSpace(data.id) ? Guid.NewGuid().ToString("N") : data.id,
                 Name = string.IsNullOrWhiteSpace(data.name) ? "Object" : data.name,
-                Type = ParseType(data.type),
+                TypeId = !string.IsNullOrWhiteSpace(data.typeId)
+                    ? new SceneObjectTypeId(data.typeId)
+                    : LegacySceneObjectTypeMigration.FromV1Type(data.type),
                 ParentId = data.parentId,
                 Transform = data.transform ?? new TransformData(),
                 Visible = data.visible,
@@ -109,11 +112,6 @@ namespace UnitySimulationX.App.ProjectSystem
             };
 
             return model;
-        }
-
-        static SceneObjectType ParseType(string value)
-        {
-            return Enum.TryParse<SceneObjectType>(value, out var type) ? type : SceneObjectType.ImportedAsset;
         }
     }
 }
