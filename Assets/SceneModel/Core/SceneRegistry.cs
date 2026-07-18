@@ -4,70 +4,61 @@ using System.Linq;
 
 namespace UnitySimulationX.SceneModel
 {
-    public sealed class SceneRegistry
+    public sealed class SceneRegistry : ISceneRegistryRead
     {
         readonly Dictionary<string, SceneObjectModel> _objects = new();
         readonly List<string> _rootIds = new();
+        readonly Dictionary<string, List<string>> _childrenByParent = new();
 
         public event Action HierarchyChanged;
 
-        public IReadOnlyList<string> RootIds => _rootIds;
+        public long Revision { get; private set; }
+
+        public IReadOnlyList<string> RootIds => _rootIds.ToList();
 
         public SceneObjectModel Get(string id)
         {
-            return _objects.TryGetValue(id, out var model) ? model : null;
+            return _objects.TryGetValue(id, out var model) ? model.Clone() : null;
         }
 
-        public IReadOnlyCollection<SceneObjectModel> GetAll() => _objects.Values;
+        public IReadOnlyCollection<SceneObjectModel> GetAll() =>
+            _objects.Values.Select(model => model.Clone()).ToList();
+
+        public IReadOnlyList<string> GetChildrenIds(string parentId) =>
+            _childrenByParent.TryGetValue(parentId, out var children)
+                ? children.ToList()
+                : Array.Empty<string>();
 
         public bool Contains(string id) => _objects.ContainsKey(id);
 
         public void Add(SceneObjectModel model)
         {
-            if (model == null || string.IsNullOrEmpty(model.Id))
-                throw new ArgumentException("Scene object requires a non-empty Id.");
-
-            if (_objects.ContainsKey(model.Id))
-                throw new InvalidOperationException($"Object already registered: {model.Id}");
-
-            _objects[model.Id] = model;
-            model.ChildrenIds ??= new List<string>();
-
-            if (string.IsNullOrEmpty(model.ParentId))
-            {
-                if (!_rootIds.Contains(model.Id))
-                    _rootIds.Add(model.Id);
-            }
-            else
-            {
-                var parent = Get(model.ParentId);
-                if (parent != null && !parent.ChildrenIds.Contains(model.Id))
-                    parent.ChildrenIds.Add(model.Id);
-            }
-
+            ValidateModelForInsert(model, isNew: true);
+            var clone = model.Clone();
+            _objects[clone.Id] = clone;
+            AttachToHierarchy(clone);
+            BumpRevision();
             HierarchyChanged?.Invoke();
         }
 
         public bool Remove(string id)
         {
-            if (!_objects.TryGetValue(id, out var model))
+            if (!_objects.ContainsKey(id))
                 return false;
 
-            var childIds = model.ChildrenIds.ToList();
-            foreach (var childId in childIds)
-                Remove(childId);
+            var toRemove = CollectDescendantIds(id);
+            toRemove.Add(id);
 
-            if (!string.IsNullOrEmpty(model.ParentId))
+            foreach (var removeId in toRemove)
             {
-                var parent = Get(model.ParentId);
-                parent?.ChildrenIds.Remove(id);
-            }
-            else
-            {
-                _rootIds.Remove(id);
+                if (!_objects.TryGetValue(removeId, out var model))
+                    continue;
+
+                DetachFromHierarchy(model);
+                _objects.Remove(removeId);
             }
 
-            _objects.Remove(id);
+            BumpRevision();
             HierarchyChanged?.Invoke();
             return true;
         }
@@ -75,60 +66,193 @@ namespace UnitySimulationX.SceneModel
         public void Reparent(string objectId, string newParentId)
         {
             if (!_objects.TryGetValue(objectId, out var model))
-                return;
+                throw new SceneInvariantException("scene.object.missing", $"Object not found: {objectId}");
 
             if (objectId == newParentId)
-                return;
+                throw new SceneInvariantException("scene.parent.self", "Object cannot parent itself.");
 
-            if (!string.IsNullOrEmpty(newParentId) && IsDescendant(newParentId, objectId))
-                return;
+            if (!string.IsNullOrEmpty(newParentId))
+            {
+                if (!_objects.ContainsKey(newParentId))
+                    throw new SceneInvariantException("scene.parent.missing", $"Parent not found: {newParentId}");
 
-            if (!string.IsNullOrEmpty(model.ParentId))
-            {
-                var oldParent = Get(model.ParentId);
-                oldParent?.ChildrenIds.Remove(objectId);
-            }
-            else
-            {
-                _rootIds.Remove(objectId);
+                if (IsDescendant(newParentId, objectId))
+                    throw new SceneInvariantException("scene.parent.cycle", "Reparent would create a cycle.");
             }
 
+            DetachFromHierarchy(model);
             model.ParentId = newParentId;
-
-            if (string.IsNullOrEmpty(newParentId))
-            {
-                if (!_rootIds.Contains(objectId))
-                    _rootIds.Add(objectId);
-            }
-            else
-            {
-                var newParent = Get(newParentId);
-                if (newParent != null && !newParent.ChildrenIds.Contains(objectId))
-                    newParent.ChildrenIds.Add(objectId);
-            }
-
+            AttachToHierarchy(model);
+            BumpRevision();
             HierarchyChanged?.Invoke();
         }
 
-        public void Update(SceneObjectModel model)
+        public void Replace(string objectId, SceneObjectModel replacement)
         {
-            if (model == null || !_objects.ContainsKey(model.Id))
-                return;
+            if (replacement == null)
+                throw new ArgumentNullException(nameof(replacement));
 
-            _objects[model.Id] = model;
+            if (!_objects.ContainsKey(objectId))
+                throw new SceneInvariantException("scene.object.missing", $"Object not found: {objectId}");
+
+            if (replacement.Id != objectId)
+                throw new SceneInvariantException("scene.id.required", "Replacement object id must match target id.");
+
+            ValidateModelForInsert(replacement, isNew: false);
+            _objects[objectId] = replacement.Clone();
+            BumpRevision();
         }
 
-        bool IsDescendant(string candidateId, string ancestorId)
+        public void ReplaceAll(IReadOnlyList<SceneObjectModel> models)
         {
-            var current = Get(candidateId);
-            while (current != null && !string.IsNullOrEmpty(current.ParentId))
+            if (models == null)
+                throw new ArgumentNullException(nameof(models));
+
+            var clones = models.Select(model =>
             {
-                if (current.ParentId == ancestorId)
+                ValidateModelForInsert(model, isNew: true);
+                return model.Clone();
+            }).ToList();
+
+            ValidateHierarchy(clones);
+
+            _objects.Clear();
+            _rootIds.Clear();
+            _childrenByParent.Clear();
+
+            foreach (var clone in clones)
+            {
+                _objects[clone.Id] = clone;
+                AttachToHierarchy(clone);
+            }
+
+            BumpRevision();
+            HierarchyChanged?.Invoke();
+        }
+
+        public void Update(SceneObjectModel model) => Replace(model.Id, model);
+
+        void ValidateModelForInsert(SceneObjectModel model, bool isNew)
+        {
+            if (model == null || string.IsNullOrEmpty(model.Id))
+                throw new SceneInvariantException("scene.id.required", "Scene object requires a non-empty id.");
+
+            if (!SceneObjectTypeId.IsValid(model.TypeId.Value))
+                throw new SceneInvariantException("scene.type.invalid", $"Invalid type id: {model.TypeId.Value}");
+
+            if (isNew && _objects.ContainsKey(model.Id))
+                throw new SceneInvariantException("scene.id.duplicate", $"Object already registered: {model.Id}");
+
+            if (!string.IsNullOrEmpty(model.ParentId) && !_objects.ContainsKey(model.ParentId))
+                throw new SceneInvariantException("scene.parent.missing", $"Parent not found: {model.ParentId}");
+
+            ValidateComponents(model);
+        }
+
+        static void ValidateComponents(SceneObjectModel model)
+        {
+            if (model.Components == null)
+                return;
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var component in model.Components)
+            {
+                if (!seen.Add(component.TypeId))
+                    throw new SceneInvariantException("scene.component.duplicate",
+                        $"Duplicate component type id: {component.TypeId}");
+            }
+        }
+
+        void ValidateHierarchy(IReadOnlyList<SceneObjectModel> models)
+        {
+            var byId = models.ToDictionary(model => model.Id);
+            foreach (var model in models)
+            {
+                if (!string.IsNullOrEmpty(model.ParentId) && !byId.ContainsKey(model.ParentId))
+                    throw new SceneInvariantException("scene.parent.missing",
+                        $"Parent not found: {model.ParentId}");
+
+                if (ContainsCycle(model.Id, byId))
+                    throw new SceneInvariantException("scene.parent.cycle", "Hierarchy contains a cycle.");
+            }
+        }
+
+        static bool ContainsCycle(string startId, Dictionary<string, SceneObjectModel> byId)
+        {
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            var currentId = startId;
+            while (byId.TryGetValue(currentId, out var current) && !string.IsNullOrEmpty(current.ParentId))
+            {
+                if (!visited.Add(current.ParentId))
                     return true;
-                current = Get(current.ParentId);
+
+                currentId = current.ParentId;
+                if (currentId == startId)
+                    return true;
             }
 
             return false;
         }
+
+        void AttachToHierarchy(SceneObjectModel model)
+        {
+            if (string.IsNullOrEmpty(model.ParentId))
+            {
+                if (!_rootIds.Contains(model.Id))
+                    _rootIds.Add(model.Id);
+                return;
+            }
+
+            if (!_childrenByParent.TryGetValue(model.ParentId, out var children))
+            {
+                children = new List<string>();
+                _childrenByParent[model.ParentId] = children;
+            }
+
+            if (!children.Contains(model.Id))
+                children.Add(model.Id);
+        }
+
+        void DetachFromHierarchy(SceneObjectModel model)
+        {
+            if (string.IsNullOrEmpty(model.ParentId))
+            {
+                _rootIds.Remove(model.Id);
+                return;
+            }
+
+            if (_childrenByParent.TryGetValue(model.ParentId, out var children))
+                children.Remove(model.Id);
+        }
+
+        List<string> CollectDescendantIds(string rootId)
+        {
+            var result = new List<string>();
+            if (!_childrenByParent.TryGetValue(rootId, out var children))
+                return result;
+
+            foreach (var childId in children.ToList())
+            {
+                result.Add(childId);
+                result.AddRange(CollectDescendantIds(childId));
+            }
+
+            return result;
+        }
+
+        bool IsDescendant(string candidateId, string ancestorId)
+        {
+            var currentId = candidateId;
+            while (_objects.TryGetValue(currentId, out var current) && !string.IsNullOrEmpty(current.ParentId))
+            {
+                if (current.ParentId == ancestorId)
+                    return true;
+                currentId = current.ParentId;
+            }
+
+            return false;
+        }
+
+        void BumpRevision() => Revision++;
     }
 }

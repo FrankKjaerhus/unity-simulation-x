@@ -21,7 +21,7 @@ namespace UnitySimulationX.Tests.EditMode
             _registry.Add(model);
 
             Assert.That(_registry.RootIds, Does.Contain("root"));
-            Assert.AreSame(model, _registry.Get("root"));
+            Assert.AreEqual("root", _registry.Get("root").Id);
         }
 
         [Test]
@@ -34,7 +34,7 @@ namespace UnitySimulationX.Tests.EditMode
             _registry.Add(parent);
             _registry.Add(child);
 
-            Assert.Contains("child", _registry.Get("parent").ChildrenIds);
+            Assert.Contains("child", _registry.GetChildrenIds("parent").ToList());
             Assert.IsFalse(_registry.RootIds.Contains("child"));
         }
 
@@ -67,8 +67,8 @@ namespace UnitySimulationX.Tests.EditMode
 
             _registry.Reparent("c", "b");
 
-            Assert.IsFalse(_registry.Get("a").ChildrenIds.Contains("c"));
-            Assert.Contains("c", _registry.Get("b").ChildrenIds);
+            Assert.IsFalse(_registry.GetChildrenIds("a").Contains("c"));
+            Assert.Contains("c", _registry.GetChildrenIds("b").ToList());
             Assert.AreEqual("b", _registry.Get("c").ParentId);
         }
 
@@ -85,7 +85,7 @@ namespace UnitySimulationX.Tests.EditMode
             _registry.Reparent("child", null);
 
             Assert.That(_registry.RootIds, Does.Contain("child"));
-            Assert.IsEmpty(_registry.Get("parent").ChildrenIds);
+            Assert.IsEmpty(_registry.GetChildrenIds("parent"));
         }
 
         static SceneObjectModel CreateModel(string id)
@@ -94,7 +94,8 @@ namespace UnitySimulationX.Tests.EditMode
             {
                 Id = id,
                 Name = id,
-                Type = SceneObjectType.Primitive
+                Type = SceneObjectType.Primitive,
+                TypeId = SceneObjectTypeIds.Primitive
             };
         }
     }

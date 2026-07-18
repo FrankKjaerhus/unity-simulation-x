@@ -13,7 +13,7 @@ namespace UnitySimulationX.App.ProjectSystem
         {
             var document = new ProjectViewerDocument();
             foreach (var model in registry.GetAll().OrderBy(m => string.IsNullOrEmpty(m.ParentId) ? 0 : 1))
-                document.scene.objects.Add(ToDocumentData(model));
+                document.scene.objects.Add(ToDocumentData(model, registry));
 
             return document;
         }
@@ -62,7 +62,7 @@ namespace UnitySimulationX.App.ProjectSystem
             }
         }
 
-        static SceneObjectDocumentData ToDocumentData(SceneObjectModel model)
+        static SceneObjectDocumentData ToDocumentData(SceneObjectModel model, SceneRegistry registry)
         {
             return new SceneObjectDocumentData
             {
@@ -70,7 +70,7 @@ namespace UnitySimulationX.App.ProjectSystem
                 name = model.Name,
                 type = model.Type.ToString(),
                 parentId = model.ParentId,
-                childrenIds = model.ChildrenIds?.ToList() ?? new List<string>(),
+                childrenIds = registry.GetChildrenIds(model.Id).ToList(),
                 transform = model.Transform?.Clone() ?? new TransformData(),
                 visible = model.Visible,
                 primitiveMeshTypeKey = model.PrimitiveMeshTypeKey,
@@ -86,7 +86,6 @@ namespace UnitySimulationX.App.ProjectSystem
                 Name = string.IsNullOrWhiteSpace(data.name) ? "Object" : data.name,
                 Type = ParseType(data.type),
                 ParentId = data.parentId,
-                ChildrenIds = new List<string>(),
                 Transform = data.transform ?? new TransformData(),
                 Visible = data.visible,
                 PrimitiveMeshTypeKey = data.primitiveMeshTypeKey,

@@ -16,7 +16,6 @@ namespace UnitySimulationX.SceneModel
         public string AssetId { get; set; }
 
         public string ParentId { get; set; }
-        public List<string> ChildrenIds { get; set; } = new();
 
         public TransformData Transform { get; set; } = new();
         public bool Visible { get; set; } = true;
@@ -43,7 +42,6 @@ namespace UnitySimulationX.SceneModel
                 TypeId = TypeId,
                 AssetId = AssetId,
                 ParentId = ParentId,
-                ChildrenIds = ChildrenIds != null ? new List<string>(ChildrenIds) : new List<string>(),
                 Transform = Transform?.Clone() ?? new TransformData(),
                 Visible = Visible,
                 Material = Material?.Clone() ?? new MaterialDefinition(),

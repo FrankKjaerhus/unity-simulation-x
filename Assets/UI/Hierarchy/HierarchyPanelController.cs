@@ -105,7 +105,7 @@ namespace UnitySimulationX.UI.Hierarchy
             var row = CreateRow(model, depth);
             _treeContainer.Add(row);
 
-            foreach (var childId in model.ChildrenIds)
+            foreach (var childId in _registry.GetChildrenIds(model.Id))
                 BuildNode(childId, depth + 1);
         }
 
@@ -117,7 +117,7 @@ namespace UnitySimulationX.UI.Hierarchy
             if (model.Name != null && model.Name.Contains(_filter, System.StringComparison.OrdinalIgnoreCase))
                 return true;
 
-            return model.ChildrenIds.Any(childId =>
+            return _registry.GetChildrenIds(model.Id).Any(childId =>
             {
                 var child = _registry.Get(childId);
                 return child != null && MatchesFilter(child);
