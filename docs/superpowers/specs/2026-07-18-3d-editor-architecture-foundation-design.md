@@ -116,7 +116,7 @@ SceneObjectModel
 ### IDs
 
 - Object IDs are stable GUID strings.
-- Type, component, importer, factory, and future library item IDs use reverse-DNS namespacing.
+- Type, component, importer, factory, and future library item IDs use lowercase reverse-DNS namespacing.
 - Examples:
   - `com.unitysimulationx.scene.root`
   - `com.unitysimulationx.scene.primitive`
