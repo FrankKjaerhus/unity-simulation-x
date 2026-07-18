@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.TestTools;
 using UnitySimulationX.Core;
 using UnitySimulationX.SceneModel;
+using UnitySimulationX.Viewer.Projection;
 using UnitySimulationX.Viewer.Selection;
 
 namespace UnitySimulationX.Tests.PlayMode
@@ -12,7 +13,7 @@ namespace UnitySimulationX.Tests.PlayMode
     {
         SceneRegistry _registry;
         SelectionService _selection;
-        SceneObjectMapper _mapper;
+        SceneProjectionService _projection;
         GameObject _root;
 
         [UnitySetUp]
@@ -23,23 +24,23 @@ namespace UnitySimulationX.Tests.PlayMode
 
             _root = new GameObject("SceneRoot");
             _registry = new SceneRegistry();
-            _mapper = new SceneObjectMapper(_root.transform);
+            _projection = new SceneProjectionService(_root.transform, _registry);
             _selection = new SelectionService(_registry);
 
             ServiceLocator.Register(_registry);
-            ServiceLocator.Register<ISceneObjectMapper>(_mapper);
+            ServiceLocator.Register<ISceneProjectionService>(_projection);
             ServiceLocator.Register<ISelectionService>(_selection);
-            ServiceLocatorBridge.SetRegistryResolver(() => _registry);
 
             var model = new SceneObjectModel
             {
                 Id = "sel1",
                 Name = "Selectable",
                 Type = SceneObjectType.Primitive,
+                TypeId = SceneObjectTypeIds.Primitive,
                 PrimitiveMeshTypeKey = "Cube"
             };
             _registry.Add(model);
-            _mapper.CreateGameObject(model);
+            _projection.CreateProjection(model);
 
             yield return null;
         }
@@ -49,7 +50,6 @@ namespace UnitySimulationX.Tests.PlayMode
         {
             ServiceLocator.Clear();
             EventBus.Clear();
-            ServiceLocatorBridge.SetRegistryResolver(null);
 
             if (_root != null)
                 Object.Destroy(_root);
@@ -76,10 +76,11 @@ namespace UnitySimulationX.Tests.PlayMode
                 Id = "sel2",
                 Name = "Second",
                 Type = SceneObjectType.Primitive,
+                TypeId = SceneObjectTypeIds.Primitive,
                 PrimitiveMeshTypeKey = "Sphere"
             };
             _registry.Add(model2);
-            _mapper.CreateGameObject(model2);
+            _projection.CreateProjection(model2);
 
             _selection.Select("sel1");
             _selection.Select("sel2", additive: true);

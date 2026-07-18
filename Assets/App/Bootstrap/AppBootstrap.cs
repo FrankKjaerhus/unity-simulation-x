@@ -14,6 +14,7 @@ using UnitySimulationX.Viewer.Gizmos;
 using UnitySimulationX.Viewer.Grid;
 using UnitySimulationX.Viewer.Measure;
 using UnitySimulationX.Viewer;
+using UnitySimulationX.Viewer.Projection;
 using UnitySimulationX.Viewer.Selection;
 using UnitySimulationX.Viewer.Tools;
 
@@ -30,7 +31,7 @@ namespace UnitySimulationX.App
         [SerializeField] UIDocumentHost uiDocumentHost;
 
         SceneRegistry _registry;
-        SceneObjectMapper _mapper;
+        SceneProjectionService _projection;
         IShellLayoutService _layoutService;
         string _sceneRootModelId;
 
@@ -46,14 +47,13 @@ namespace UnitySimulationX.App
             if (sceneRoot == null)
                 sceneRoot = root;
 
-            _mapper = new SceneObjectMapper(root);
-            ServiceLocator.Register<ISceneObjectMapper>(_mapper);
-            ServiceLocatorBridge.SetRegistryResolver(() => _registry);
+            _projection = new SceneProjectionService(root, _registry);
+            ServiceLocator.Register<ISceneProjectionService>(_projection);
 
             var selection = new SelectionService(_registry);
             ServiceLocator.Register<ISelectionService>(selection);
 
-            var primitiveFactory = new PrimitiveFactory(_registry, _mapper);
+            var primitiveFactory = new PrimitiveFactory(_registry, _projection);
             ServiceLocator.Register<IPrimitiveFactory>(primitiveFactory);
 
             var importerRegistry = new ImporterRegistry();
@@ -61,9 +61,9 @@ namespace UnitySimulationX.App
             importerRegistry.Register(new StlSceneAssetImporter());
             importerRegistry.Register(new GltfSceneAssetImporter());
             ServiceLocator.Register(importerRegistry);
-            ServiceLocator.Register<IImportSceneService>(new ImportSceneService(importerRegistry, _registry, _mapper));
+            ServiceLocator.Register<IImportSceneService>(new ImportSceneService(importerRegistry, _registry, _projection));
 
-            ServiceLocator.Register<IProjectPersistenceService>(new ProjectPersistenceService(_registry, _mapper));
+            ServiceLocator.Register<IProjectPersistenceService>(new ProjectPersistenceService(_registry, _projection));
             ServiceLocator.Register<IFileDialogService>(new NativeFileDialogService());
             ServiceLocator.Register<IViewportToolService>(new ViewportToolService());
 
@@ -200,7 +200,7 @@ namespace UnitySimulationX.App
             };
 
             _registry.Add(rootModel);
-            _mapper.CreateGameObject(rootModel);
+            _projection.CreateProjection(rootModel);
             _sceneRootModelId = rootModel.Id;
         }
 
@@ -237,7 +237,7 @@ namespace UnitySimulationX.App
                 };
 
                 _registry.Add(model);
-                _mapper.RegisterExistingGameObject(model, candidate);
+                _projection.RegisterExistingTarget(model.Id, candidate);
             }
         }
 

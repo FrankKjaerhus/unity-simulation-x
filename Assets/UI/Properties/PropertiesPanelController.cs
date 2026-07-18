@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using UnitySimulationX.Core;
 using UnitySimulationX.SceneModel;
+using UnitySimulationX.Viewer.Projection;
 using UnitySimulationX.Viewer.Selection;
 
 namespace UnitySimulationX.UI.Properties
@@ -16,7 +17,7 @@ namespace UnitySimulationX.UI.Properties
 
         SceneRegistry _registry;
         ISelectionService _selection;
-        ISceneObjectMapper _mapper;
+        ISceneProjectionService _projection;
         SceneObjectModel _current;
 
         public PropertiesPanelController(VisualElement root)
@@ -36,7 +37,7 @@ namespace UnitySimulationX.UI.Properties
 
             _registry = ServiceLocator.Resolve<SceneRegistry>();
             _selection = ServiceLocator.Resolve<ISelectionService>();
-            _mapper = ServiceLocator.Resolve<ISceneObjectMapper>();
+            _projection = ServiceLocator.Resolve<ISceneProjectionService>();
 
             EventBus.Subscribe<SelectionChangedEvent>(OnSelectionChanged);
             EventBus.Subscribe<SceneObjectChangedEvent>(OnSceneObjectChanged);
@@ -163,9 +164,7 @@ namespace UnitySimulationX.UI.Properties
             }
 
             _registry.Update(_current);
-            var go = _mapper.GetGameObject(_current.Id);
-            if (go != null)
-                _mapper.UpdateGameObject(_current, go);
+            _projection.UpdateProjection(_current);
 
             EventBus.Publish(new SceneObjectChangedEvent { ObjectId = _current.Id, Model = _current });
         }

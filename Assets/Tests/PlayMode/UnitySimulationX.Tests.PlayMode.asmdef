@@ -3,6 +3,7 @@
     "rootNamespace": "UnitySimulationX.Tests.PlayMode",
     "references": [
         "UnitySimulationX.Core",
+        "UnitySimulationX.Editing",
         "UnitySimulationX.SceneModel",
         "UnitySimulationX.Viewer",
         "UnityEngine.TestRunner",

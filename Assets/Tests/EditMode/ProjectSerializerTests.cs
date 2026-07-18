@@ -2,6 +2,7 @@ using NUnit.Framework;
 using UnityEngine;
 using UnitySimulationX.App.ProjectSystem;
 using UnitySimulationX.SceneModel;
+using UnitySimulationX.Viewer.Projection;
 
 namespace UnitySimulationX.Tests.EditMode
 {
@@ -32,17 +33,17 @@ namespace UnitySimulationX.Tests.EditMode
             var document = ProjectSerializer.CreateDocument(sourceRegistry);
             var sceneRoot = new GameObject("SerializerTestRoot");
             var targetRegistry = new SceneRegistry();
-            var mapper = new SceneObjectMapper(sceneRoot.transform);
+            var projection = new SceneProjectionService(sceneRoot.transform, targetRegistry);
 
             try
             {
-                ProjectSerializer.ApplyDocument(document, targetRegistry, mapper);
+                ProjectSerializer.ApplyDocument(document, targetRegistry, projection);
 
                 var loadedChild = targetRegistry.Get("child");
                 Assert.IsNotNull(loadedChild);
                 Assert.AreEqual("root", loadedChild.ParentId);
                 Assert.AreEqual(new Vector3(1f, 2f, 3f), loadedChild.Transform.Position);
-                Assert.IsNotNull(mapper.GetGameObject("child"));
+                Assert.IsNotNull(projection.GetGameObject("child"));
             }
             finally
             {

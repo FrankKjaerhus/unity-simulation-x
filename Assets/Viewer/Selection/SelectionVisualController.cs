@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnitySimulationX.Core;
 using UnitySimulationX.SceneModel;
+using UnitySimulationX.Viewer.Projection;
 using UnitySimulationX.Viewer.Settings;
 
 namespace UnitySimulationX.Viewer.Selection
@@ -62,7 +63,7 @@ namespace UnitySimulationX.Viewer.Selection
 
         void RefreshOutline()
         {
-            if (!ServiceLocator.TryResolve<ISceneObjectMapper>(out var mapper))
+            if (!ServiceLocator.TryResolve<ISceneProjectionService>(out var mapper))
                 return;
 
             if (_selectedIds == null || _selectedIds.Count == 0)

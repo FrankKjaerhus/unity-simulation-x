@@ -1,14 +1,16 @@
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using UnitySimulationX.SceneModel;
+using UnitySimulationX.Viewer.Projection;
 
 namespace UnitySimulationX.Tests.EditMode
 {
-    public sealed class SceneObjectMapperTests
+    public sealed class SceneProjectionServiceTests
     {
         Transform _sceneRoot;
         SceneRegistry _registry;
-        SceneObjectMapper _mapper;
+        SceneProjectionService _projection;
 
         [SetUp]
         public void SetUp()
@@ -16,8 +18,7 @@ namespace UnitySimulationX.Tests.EditMode
             var rootGo = new GameObject("TestSceneRoot");
             _sceneRoot = rootGo.transform;
             _registry = new SceneRegistry();
-            _mapper = new SceneObjectMapper(_sceneRoot);
-            ServiceLocatorBridge.SetRegistryResolver(() => _registry);
+            _projection = new SceneProjectionService(_sceneRoot, _registry);
         }
 
         [TearDown]
@@ -25,22 +26,23 @@ namespace UnitySimulationX.Tests.EditMode
         {
             if (_sceneRoot != null)
                 Object.DestroyImmediate(_sceneRoot.gameObject);
-            ServiceLocatorBridge.SetRegistryResolver(null);
         }
 
         [Test]
-        public void CreateGameObject_SetsIdComponent()
+        public void CreateProjection_SetsIdComponent()
         {
             var model = new SceneObjectModel
             {
                 Id = "obj1",
                 Name = "Cube",
                 Type = SceneObjectType.Primitive,
+                TypeId = SceneObjectTypeIds.Primitive,
                 PrimitiveMeshTypeKey = "Cube"
             };
             _registry.Add(model);
 
-            var go = _mapper.CreateGameObject(model);
+            _projection.CreateProjection(model);
+            var go = _projection.GetGameObject(model.Id);
             var idComponent = go.GetComponent<SceneObjectIdComponent>();
 
             Assert.IsNotNull(go);
@@ -49,79 +51,86 @@ namespace UnitySimulationX.Tests.EditMode
         }
 
         [Test]
-        public void GetModel_RoundTripsFromGameObject()
+        public void GetObjectId_RoundTripsFromGameObject()
         {
             var model = new SceneObjectModel
             {
                 Id = "obj2",
                 Name = "Sphere",
                 Type = SceneObjectType.Primitive,
+                TypeId = SceneObjectTypeIds.Primitive,
                 PrimitiveMeshTypeKey = "Sphere"
             };
             _registry.Add(model);
-            var go = _mapper.CreateGameObject(model);
+            _projection.CreateProjection(model);
+            var go = _projection.GetGameObject(model.Id);
 
-            var resolved = _mapper.GetModel(go);
+            var objectId = _projection.GetObjectId(go);
 
-            Assert.IsNotNull(resolved);
-            Assert.AreEqual("obj2", resolved.Id);
+            Assert.AreEqual("obj2", objectId);
+            Assert.AreEqual("obj2", _registry.Get(objectId).Id);
         }
 
         [Test]
-        public void RegisterExistingGameObject_SetsIdAndMapsExistingObject()
+        public void RegisterExistingTarget_SetsIdAndMapsExistingObject()
         {
             var model = new SceneObjectModel
             {
                 Id = "existing",
                 Name = "Existing",
-                Type = SceneObjectType.ImportedAsset
+                Type = SceneObjectType.ImportedAsset,
+                TypeId = SceneObjectTypeIds.ImportedModel
             };
             var existing = new GameObject("Existing");
             _registry.Add(model);
 
-            var registered = _mapper.RegisterExistingGameObject(model, existing);
+            _projection.RegisterExistingTarget(model.Id, existing);
             var idComponent = existing.GetComponent<SceneObjectIdComponent>();
 
-            Assert.AreSame(existing, registered);
+            Assert.AreSame(existing, _projection.GetGameObject("existing"));
             Assert.IsNotNull(idComponent);
             Assert.AreEqual("existing", idComponent.SceneObjectId);
-            Assert.AreSame(existing, _mapper.GetGameObject("existing"));
-            Assert.AreEqual(model, _mapper.GetModel(existing));
+            Assert.AreEqual("existing", _projection.GetObjectId(existing));
+            Assert.AreEqual("existing", _registry.Get(_projection.GetObjectId(existing)).Id);
         }
 
         [Test]
-        public void UpdateGameObject_AppliesTransform()
+        public void UpdateProjection_AppliesTransform()
         {
             var model = new SceneObjectModel
             {
                 Id = "obj3",
                 Name = "Moved",
                 Type = SceneObjectType.Primitive,
+                TypeId = SceneObjectTypeIds.Primitive,
                 PrimitiveMeshTypeKey = "Cube",
                 Transform = new TransformData { Position = Vector3.zero }
             };
             _registry.Add(model);
-            var go = _mapper.CreateGameObject(model);
+            _projection.CreateProjection(model);
+            var go = _projection.GetGameObject(model.Id);
 
             model.Transform.Position = new Vector3(2f, 1f, 0.5f);
-            _mapper.UpdateGameObject(model, go);
+            _projection.UpdateProjection(model);
 
             Assert.AreEqual(new Vector3(2f, 1f, 0.5f), go.transform.localPosition);
         }
 
         [Test]
-        public void UpdateGameObject_DoesNotReplaceExistingMaterial()
+        public void UpdateProjection_DoesNotReplaceExistingMaterial()
         {
             var model = new SceneObjectModel
             {
                 Id = "obj5",
                 Name = "Colored",
                 Type = SceneObjectType.Primitive,
+                TypeId = SceneObjectTypeIds.Primitive,
                 PrimitiveMeshTypeKey = "Cube",
                 Transform = new TransformData { Position = Vector3.zero }
             };
             _registry.Add(model);
-            var go = _mapper.CreateGameObject(model);
+            _projection.CreateProjection(model);
+            var go = _projection.GetGameObject(model.Id);
 
             var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
             var customMaterial = new Material(shader);
@@ -129,27 +138,36 @@ namespace UnitySimulationX.Tests.EditMode
             go.GetComponent<Renderer>().sharedMaterial = customMaterial;
 
             model.Transform.Position = new Vector3(1f, 0f, 0f);
-            _mapper.UpdateGameObject(model, go);
+            _projection.UpdateProjection(model);
 
             Assert.AreEqual(customMaterial, go.GetComponent<Renderer>().sharedMaterial);
         }
 
         [Test]
-        public void DestroyGameObject_RemovesInstance()
+        public void RemoveProjection_RemovesInstance()
         {
             var model = new SceneObjectModel
             {
                 Id = "obj4",
                 Name = "Temp",
                 Type = SceneObjectType.Primitive,
+                TypeId = SceneObjectTypeIds.Primitive,
                 PrimitiveMeshTypeKey = "Cube"
             };
             _registry.Add(model);
-            _mapper.CreateGameObject(model);
+            _projection.CreateProjection(model);
 
-            _mapper.DestroyGameObject("obj4");
+            _projection.RemoveProjection("obj4");
 
-            Assert.IsNull(_mapper.GetGameObject("obj4"));
+            Assert.IsNull(_projection.GetGameObject("obj4"));
+        }
+
+        [Test]
+        public void SceneModelAssembly_DoesNotContainProjectionTypes()
+        {
+            var assembly = typeof(SceneObjectModel).Assembly;
+            Assert.IsNull(assembly.GetType("UnitySimulationX.SceneModel.SceneObjectMapper"));
+            Assert.IsNull(assembly.GetType("UnitySimulationX.SceneModel.SceneObjectIdComponent"));
         }
     }
 }

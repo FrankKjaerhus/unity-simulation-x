@@ -3,6 +3,7 @@
     "rootNamespace": "UnitySimulationX.Tests.EditMode",
     "references": [
         "UnitySimulationX.Core",
+        "UnitySimulationX.Editing",
         "UnitySimulationX.App",
         "UnitySimulationX.Import",
         "UnitySimulationX.SceneModel",

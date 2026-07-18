@@ -1,18 +1,19 @@
 using System;
 using UnitySimulationX.Core;
 using UnitySimulationX.SceneModel;
+using UnitySimulationX.Viewer.Projection;
 
 namespace UnitySimulationX.Import
 {
     public sealed class PrimitiveFactory : IPrimitiveFactory
     {
         readonly SceneRegistry _registry;
-        readonly ISceneObjectMapper _mapper;
+        readonly ISceneProjectionService _projection;
 
-        public PrimitiveFactory(SceneRegistry registry, ISceneObjectMapper mapper)
+        public PrimitiveFactory(SceneRegistry registry, ISceneProjectionService projection)
         {
             _registry = registry;
-            _mapper = mapper;
+            _projection = projection;
         }
 
         public SceneObjectModel CreatePrimitive(PrimitiveMeshType type, PrimitiveSettings settings)
@@ -36,7 +37,7 @@ namespace UnitySimulationX.Import
             };
 
             _registry.Add(model);
-            _mapper.CreateGameObject(model);
+            _projection.CreateProjection(model);
 
             EventBus.Publish(new HierarchyChangedEvent());
             EventBus.Publish(new SceneObjectChangedEvent { ObjectId = model.Id, Model = model });

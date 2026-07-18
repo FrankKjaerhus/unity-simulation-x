@@ -4,6 +4,7 @@ using UnityEngine.InputSystem;
 using UnitySimulationX.Core;
 using UnitySimulationX.SceneModel;
 using UnitySimulationX.Viewer;
+using UnitySimulationX.Viewer.Projection;
 using UnitySimulationX.Viewer.Selection;
 
 namespace UnitySimulationX.Viewer.Gizmos
@@ -89,7 +90,7 @@ namespace UnitySimulationX.Viewer.Gizmos
         {
             if (!ServiceLocator.TryResolve<ISelectionService>(out var selection) ||
                 selection.SelectedObjectIds.Count == 0 ||
-                !ServiceLocator.TryResolve<ISceneObjectMapper>(out var mapper))
+                !ServiceLocator.TryResolve<ISceneProjectionService>(out var mapper))
                 return;
 
             _grabEntries.Clear();
@@ -126,7 +127,7 @@ namespace UnitySimulationX.Viewer.Gizmos
         void ContinueGrab(Mouse mouse)
         {
             if (!ServiceLocator.TryResolve<SceneRegistry>(out var registry) ||
-                !ServiceLocator.TryResolve<ISceneObjectMapper>(out var mapper))
+                !ServiceLocator.TryResolve<ISceneProjectionService>(out var mapper))
                 return;
 
             var ray = _camera.ScreenPointToRay(mouse.position.ReadValue());
@@ -148,7 +149,7 @@ namespace UnitySimulationX.Viewer.Gizmos
                     ? entry.Parent.InverseTransformPoint(newWorld)
                     : newWorld;
 
-                mapper.UpdateGameObject(model, go);
+                mapper.UpdateProjection(model);
             }
         }
 
@@ -183,7 +184,7 @@ namespace UnitySimulationX.Viewer.Gizmos
                 return;
 
             if (!ServiceLocator.TryResolve<SceneRegistry>(out var registry) ||
-                !ServiceLocator.TryResolve<ISceneObjectMapper>(out var mapper))
+                !ServiceLocator.TryResolve<ISceneProjectionService>(out var mapper))
             {
                 EndGrab();
                 return;
@@ -200,7 +201,7 @@ namespace UnitySimulationX.Viewer.Gizmos
                     ? entry.Parent.InverseTransformPoint(entry.WorldStartPosition)
                     : entry.WorldStartPosition;
 
-                mapper.UpdateGameObject(model, go);
+                mapper.UpdateProjection(model);
             }
 
             EndGrab();

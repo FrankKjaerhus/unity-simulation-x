@@ -3,18 +3,19 @@ using UnityEngine;
 using UnitySimulationX.Core;
 using UnitySimulationX.SceneModel;
 using UnitySimulationX.SceneModel.Serialization;
+using UnitySimulationX.Viewer.Projection;
 
 namespace UnitySimulationX.App.ProjectSystem
 {
     public sealed class ProjectPersistenceService : IProjectPersistenceService
     {
         readonly SceneRegistry _registry;
-        readonly ISceneObjectMapper _mapper;
+        readonly ISceneProjectionService _projection;
 
-        public ProjectPersistenceService(SceneRegistry registry, ISceneObjectMapper mapper)
+        public ProjectPersistenceService(SceneRegistry registry, ISceneProjectionService projection)
         {
             _registry = registry;
-            _mapper = mapper;
+            _projection = projection;
         }
 
         public string CurrentPath { get; private set; }
@@ -38,7 +39,7 @@ namespace UnitySimulationX.App.ProjectSystem
 
             var json = File.ReadAllText(path);
             var document = JsonUtility.FromJson<ProjectViewerDocument>(json);
-            ProjectSerializer.ApplyDocument(document, _registry, _mapper);
+            ProjectSerializer.ApplyDocument(document, _registry, _projection);
             CurrentPath = path;
 
             EventBus.Publish(new HierarchyChangedEvent());

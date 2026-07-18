@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnitySimulationX.Core;
 using UnitySimulationX.SceneModel;
+using UnitySimulationX.Viewer.Projection;
 
 namespace UnitySimulationX.Import
 {
@@ -10,13 +11,13 @@ namespace UnitySimulationX.Import
     {
         readonly ImporterRegistry _importers;
         readonly SceneRegistry _registry;
-        readonly ISceneObjectMapper _mapper;
+        readonly ISceneProjectionService _projection;
 
-        public ImportSceneService(ImporterRegistry importers, SceneRegistry registry, ISceneObjectMapper mapper)
+        public ImportSceneService(ImporterRegistry importers, SceneRegistry registry, ISceneProjectionService projection)
         {
             _importers = importers;
             _registry = registry;
-            _mapper = mapper;
+            _projection = projection;
         }
 
         public async Task ImportFileAsync(string path)
@@ -38,8 +39,8 @@ namespace UnitySimulationX.Import
             result.RootObject.DomainProperties["SourcePath"] = path;
             _registry.Add(result.RootObject);
             var root = result.ImportedGameObject != null
-                ? _mapper.RegisterExistingGameObject(result.RootObject, result.ImportedGameObject)
-                : _mapper.CreateGameObject(result.RootObject);
+                ? RegisterImportedGameObject(result.RootObject, result.ImportedGameObject)
+                : CreateImportedProjection(result.RootObject);
 
             if (root != null && result.Meshes.Count > 0)
                 ApplyMesh(root, result.Meshes[0], result.Materials.Count > 0 ? result.Materials[0] : null);
@@ -114,6 +115,18 @@ namespace UnitySimulationX.Import
                 var collider = filter.gameObject.AddComponent<MeshCollider>();
                 collider.sharedMesh = filter.sharedMesh;
             }
+        }
+
+        GameObject RegisterImportedGameObject(SceneObjectModel model, GameObject target)
+        {
+            _projection.RegisterExistingTarget(model.Id, target);
+            return target;
+        }
+
+        GameObject CreateImportedProjection(SceneObjectModel model)
+        {
+            _projection.CreateProjection(model);
+            return _projection.GetGameObject(model.Id);
         }
     }
 }

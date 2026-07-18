@@ -1,122 +1,128 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
+using UnitySimulationX.SceneModel;
 
-namespace UnitySimulationX.SceneModel
+namespace UnitySimulationX.Viewer.Projection
 {
-    public sealed class SceneObjectMapper : ISceneObjectMapper
+    public sealed class SceneProjectionService : ISceneProjectionService
     {
         readonly Dictionary<string, GameObject> _gameObjects = new();
         readonly Transform _sceneRoot;
+        readonly ISceneRegistryRead _registry;
 
-        public SceneObjectMapper(Transform sceneRoot)
+        public SceneProjectionService(Transform sceneRoot, ISceneRegistryRead registry)
         {
             _sceneRoot = sceneRoot;
+            _registry = registry;
         }
 
         public Transform SceneRoot => _sceneRoot;
 
-        public GameObject CreateGameObject(SceneObjectModel model)
+        public void CreateProjection(SceneObjectModel snapshot)
         {
-            if (model == null || string.IsNullOrEmpty(model.Id))
-                return null;
+            if (snapshot == null || string.IsNullOrEmpty(snapshot.Id))
+                return;
 
-            if (_gameObjects.ContainsKey(model.Id))
-                DestroyGameObject(model.Id);
+            if (_gameObjects.ContainsKey(snapshot.Id))
+                RemoveProjection(snapshot.Id);
 
-            var go = new GameObject(model.Name ?? model.Id);
+            var go = new GameObject(snapshot.Name ?? snapshot.Id);
             var idComponent = go.AddComponent<SceneObjectIdComponent>();
-            idComponent.SceneObjectId = model.Id;
+            idComponent.SceneObjectId = snapshot.Id;
 
-            if (!string.IsNullOrEmpty(model.PrimitiveMeshTypeKey))
-            {
-                ApplyPrimitiveMesh(go, model.PrimitiveMeshTypeKey);
-            }
+            if (!string.IsNullOrEmpty(snapshot.PrimitiveMeshTypeKey))
+                ApplyPrimitiveMesh(go, snapshot.PrimitiveMeshTypeKey);
 
-            ApplyTransform(go.transform, model);
-            ApplyVisibility(go, model.Visible);
-            ApplyMaterial(go, model.Material);
-            ParentGameObject(go, model.ParentId);
+            ApplyTransform(go.transform, snapshot.Transform);
+            ApplyVisibility(go, snapshot.Visible);
+            ApplyMaterial(go, snapshot.Material);
+            ParentGameObject(go, snapshot.ParentId);
 
-            _gameObjects[model.Id] = go;
-            return go;
+            _gameObjects[snapshot.Id] = go;
         }
 
-        public GameObject RegisterExistingGameObject(SceneObjectModel model, GameObject target)
+        public void RegisterExistingTarget(string objectId, GameObject target)
         {
-            if (model == null || string.IsNullOrEmpty(model.Id) || target == null)
-                return null;
+            if (string.IsNullOrEmpty(objectId) || target == null)
+                return;
 
-            if (_gameObjects.TryGetValue(model.Id, out var existing) && existing != target)
-                DestroyGameObject(model.Id);
+            if (_gameObjects.TryGetValue(objectId, out var existing) && existing != target)
+                RemoveProjection(objectId);
 
             var idComponent = target.GetComponent<SceneObjectIdComponent>();
             if (idComponent == null)
                 idComponent = target.AddComponent<SceneObjectIdComponent>();
 
-            idComponent.SceneObjectId = model.Id;
-            ParentGameObject(target, model.ParentId, worldPositionStays: true);
-            _gameObjects[model.Id] = target;
-            return target;
+            idComponent.SceneObjectId = objectId;
+
+            var snapshot = _registry.Get(objectId);
+            if (snapshot != null)
+                ParentGameObject(target, snapshot.ParentId, worldPositionStays: true);
+
+            _gameObjects[objectId] = target;
         }
 
-        public void UpdateGameObject(SceneObjectModel model, GameObject target)
+        public void UpdateProjection(SceneObjectModel snapshot)
         {
-            if (model == null || target == null)
+            if (snapshot == null || !_gameObjects.TryGetValue(snapshot.Id, out var target) || target == null)
                 return;
 
-            target.name = model.Name ?? model.Id;
-            ApplyTransform(target.transform, model);
-            ApplyVisibility(target, model.Visible);
-            ParentGameObject(target, model.ParentId);
+            target.name = snapshot.Name ?? snapshot.Id;
+            ApplyTransform(target.transform, snapshot.Transform);
+            ApplyVisibility(target, snapshot.Visible);
+            ParentGameObject(target, snapshot.ParentId);
 
             var idComponent = target.GetComponent<SceneObjectIdComponent>();
             if (idComponent != null)
-                idComponent.SceneObjectId = model.Id;
+                idComponent.SceneObjectId = snapshot.Id;
         }
 
-        public void DestroyGameObject(string sceneObjectId)
+        public void PreviewTransform(string objectId, TransformData transform)
         {
-            if (!_gameObjects.TryGetValue(sceneObjectId, out var go))
+            if (!_gameObjects.TryGetValue(objectId, out var go) || go == null)
                 return;
 
-            _gameObjects.Remove(sceneObjectId);
+            ApplyTransform(go.transform, transform);
+        }
+
+        public void RemoveProjection(string objectId)
+        {
+            if (!_gameObjects.TryGetValue(objectId, out var go))
+                return;
+
+            _gameObjects.Remove(objectId);
             if (go != null)
                 Object.Destroy(go);
         }
 
-        public GameObject GetGameObject(string sceneObjectId)
+        public void ReplaceAllProjections(IReadOnlyList<SceneObjectModel> snapshots)
         {
-            return _gameObjects.TryGetValue(sceneObjectId, out var go) ? go : null;
+            foreach (var id in _gameObjects.Keys.ToList())
+                RemoveProjection(id);
+
+            if (snapshots == null)
+                return;
+
+            foreach (var snapshot in snapshots)
+                CreateProjection(snapshot);
         }
 
-        public SceneObjectModel GetModel(GameObject gameObject)
+        public GameObject GetGameObject(string objectId) =>
+            _gameObjects.TryGetValue(objectId, out var go) ? go : null;
+
+        public string GetObjectId(GameObject gameObject)
         {
             if (gameObject == null)
                 return null;
 
             var idComponent = gameObject.GetComponent<SceneObjectIdComponent>();
-            if (idComponent == null || string.IsNullOrEmpty(idComponent.SceneObjectId))
-                return null;
-
-            return ServiceLocatorBridge.TryGetRegistry()?.Get(idComponent.SceneObjectId);
+            return idComponent != null && !string.IsNullOrEmpty(idComponent.SceneObjectId)
+                ? idComponent.SceneObjectId
+                : null;
         }
 
-        void ParentGameObject(GameObject go, string parentId)
-        {
-            if (!string.IsNullOrEmpty(parentId))
-            {
-                var parentGo = GetGameObject(parentId);
-                if (parentGo != null)
-                {
-                    go.transform.SetParent(parentGo.transform, false);
-                    return;
-                }
-            }
-
-            go.transform.SetParent(_sceneRoot, false);
-        }
-
-        void ParentGameObject(GameObject go, string parentId, bool worldPositionStays)
+        void ParentGameObject(GameObject go, string parentId, bool worldPositionStays = false)
         {
             if (!string.IsNullOrEmpty(parentId))
             {
@@ -131,9 +137,9 @@ namespace UnitySimulationX.SceneModel
             go.transform.SetParent(_sceneRoot, worldPositionStays);
         }
 
-        static void ApplyTransform(Transform transform, SceneObjectModel model)
+        static void ApplyTransform(Transform transform, TransformData data)
         {
-            var data = model.Transform ?? new TransformData();
+            data ??= new TransformData();
             transform.localPosition = data.Position;
             transform.localRotation = Quaternion.Euler(data.RotationEuler);
             transform.localScale = data.Scale;
@@ -191,7 +197,7 @@ namespace UnitySimulationX.SceneModel
             }
             else if (meshTypeKey == "Cone")
             {
-                mesh = ConeMeshGenerator.Create();
+                mesh = PrimitiveMeshBuilder.CreateCone();
             }
             else
             {
@@ -235,20 +241,5 @@ namespace UnitySimulationX.SceneModel
                     break;
             }
         }
-    }
-
-    /// <summary>
-    /// Avoids circular asmdef reference from SceneModel to App.
-    /// </summary>
-    public static class ServiceLocatorBridge
-    {
-        static System.Func<SceneRegistry> _registryResolver;
-
-        public static void SetRegistryResolver(System.Func<SceneRegistry> resolver)
-        {
-            _registryResolver = resolver;
-        }
-
-        public static SceneRegistry TryGetRegistry() => _registryResolver?.Invoke();
     }
 }

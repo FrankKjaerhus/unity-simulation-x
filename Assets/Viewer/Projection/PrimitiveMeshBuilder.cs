@@ -1,10 +1,10 @@
 using UnityEngine;
 
-namespace UnitySimulationX.SceneModel
+namespace UnitySimulationX.Viewer.Projection
 {
-    public static class ConeMeshGenerator
+    public static class PrimitiveMeshBuilder
     {
-        public static Mesh Create(int segments = 24)
+        public static Mesh CreateCone(int segments = 24)
         {
             segments = Mathf.Max(3, segments);
             var mesh = new Mesh { name = "ProceduralCone" };

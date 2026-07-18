@@ -3,6 +3,7 @@
     "rootNamespace": "UnitySimulationX.Viewer",
     "references": [
         "UnitySimulationX.Core",
+        "UnitySimulationX.Editing",
         "UnitySimulationX.SceneModel",
         "Unity.InputSystem"
     ],

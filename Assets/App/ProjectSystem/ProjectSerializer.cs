@@ -4,6 +4,7 @@ using System.Linq;
 using UnityEngine;
 using UnitySimulationX.SceneModel;
 using UnitySimulationX.SceneModel.Serialization;
+using UnitySimulationX.Viewer.Projection;
 
 namespace UnitySimulationX.App.ProjectSystem
 {
@@ -18,14 +19,14 @@ namespace UnitySimulationX.App.ProjectSystem
             return document;
         }
 
-        public static void ApplyDocument(ProjectViewerDocument document, SceneRegistry registry, ISceneObjectMapper mapper)
+        public static void ApplyDocument(ProjectViewerDocument document, SceneRegistry registry, ISceneProjectionService projection)
         {
             if (document?.scene?.objects == null)
                 return;
 
             var existingIds = registry.GetAll().Select(model => model.Id).ToList();
             foreach (var id in existingIds)
-                mapper.DestroyGameObject(id);
+                projection.RemoveProjection(id);
 
             foreach (var rootId in registry.RootIds.ToList())
                 registry.Remove(rootId);
@@ -44,7 +45,7 @@ namespace UnitySimulationX.App.ProjectSystem
 
                     var model = FromDocumentData(data);
                     registry.Add(model);
-                    mapper.CreateGameObject(model);
+                    projection.CreateProjection(model);
                     remaining.RemoveAt(i);
                     addedAny = true;
                 }
@@ -58,7 +59,7 @@ namespace UnitySimulationX.App.ProjectSystem
                 data.parentId = null;
                 var model = FromDocumentData(data);
                 registry.Add(model);
-                mapper.CreateGameObject(model);
+                projection.CreateProjection(model);
             }
         }
 

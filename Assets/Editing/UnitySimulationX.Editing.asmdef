@@ -1,9 +1,8 @@
 {
-    "name": "UnitySimulationX.Import",
-    "rootNamespace": "UnitySimulationX.Import",
+    "name": "UnitySimulationX.Editing",
+    "rootNamespace": "UnitySimulationX.Editing",
     "references": [
         "UnitySimulationX.Core",
-        "UnitySimulationX.Editing",
         "UnitySimulationX.SceneModel"
     ],
     "includePlatforms": [],

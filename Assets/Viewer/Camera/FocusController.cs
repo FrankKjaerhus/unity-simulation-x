@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnitySimulationX.SceneModel;
+using UnitySimulationX.Viewer.Projection;
 
 namespace UnitySimulationX.Viewer.Camera
 {
@@ -9,14 +10,14 @@ namespace UnitySimulationX.Viewer.Camera
         readonly Transform _pivot;
         readonly UnityEngine.Camera _camera;
         readonly OrbitController _orbit;
-        readonly ISceneObjectMapper _mapper;
+        readonly ISceneProjectionService _projection;
 
-        public FocusController(Transform pivot, UnityEngine.Camera camera, OrbitController orbit, ISceneObjectMapper mapper)
+        public FocusController(Transform pivot, UnityEngine.Camera camera, OrbitController orbit, ISceneProjectionService projection)
         {
             _pivot = pivot;
             _camera = camera;
             _orbit = orbit;
-            _mapper = mapper;
+            _projection = projection;
         }
 
         public void FocusObjects(IEnumerable<string> objectIds, float padding = 1.25f)
@@ -76,7 +77,7 @@ namespace UnitySimulationX.Viewer.Camera
             Bounds? result = null;
             foreach (var id in objectIds)
             {
-                var go = _mapper.GetGameObject(id);
+                var go = _projection.GetGameObject(id);
                 if (go == null)
                     continue;
 

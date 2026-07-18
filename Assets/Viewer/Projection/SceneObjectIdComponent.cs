@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace UnitySimulationX.SceneModel
+namespace UnitySimulationX.Viewer.Projection
 {
     /// <summary>
     /// Stores the domain object id on a runtime GameObject.

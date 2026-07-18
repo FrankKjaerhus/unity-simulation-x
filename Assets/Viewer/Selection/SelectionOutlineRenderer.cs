@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnitySimulationX.SceneModel;
+using UnitySimulationX.Viewer.Projection;
 using UnitySimulationX.Viewer.Settings;
 
 namespace UnitySimulationX.Viewer.Selection
@@ -22,7 +23,7 @@ namespace UnitySimulationX.Viewer.Selection
         static readonly List<GameObject> OutlineObjects = new();
 
         public static void ApplyOutline(
-            ISceneObjectMapper mapper,
+            ISceneProjectionService projection,
             IReadOnlyList<string> selectedIds,
             ViewerPresentationSettings settings,
             OutlineStyle style = OutlineStyle.Selected)
@@ -35,7 +36,7 @@ namespace UnitySimulationX.Viewer.Selection
 
             foreach (var id in selectedIds)
             {
-                var go = mapper.GetGameObject(id);
+                var go = projection.GetGameObject(id);
                 if (go == null)
                     continue;
 

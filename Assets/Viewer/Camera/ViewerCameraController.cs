@@ -3,6 +3,7 @@ using UnityEngine.InputSystem;
 using UnitySimulationX.Core;
 using UnitySimulationX.SceneModel;
 using UnitySimulationX.Viewer;
+using UnitySimulationX.Viewer.Projection;
 using UnitySimulationX.Viewer.Selection;
 
 namespace UnitySimulationX.Viewer.Camera
@@ -43,8 +44,8 @@ namespace UnitySimulationX.Viewer.Camera
 
         void Start()
         {
-            if (ServiceLocator.TryResolve<ISceneObjectMapper>(out var mapper))
-                _focus = new FocusController(pivot, _camera, _orbit, mapper);
+            if (ServiceLocator.TryResolve<ISceneProjectionService>(out var projection))
+                _focus = new FocusController(pivot, _camera, _orbit, projection);
 
             if (_camera.transform.position == Vector3.zero)
             {

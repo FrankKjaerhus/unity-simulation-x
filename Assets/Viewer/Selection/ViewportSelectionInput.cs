@@ -4,6 +4,7 @@ using UnitySimulationX.Core;
 using UnitySimulationX.SceneModel;
 using UnitySimulationX.Viewer;
 using UnitySimulationX.Viewer.Gizmos;
+using UnitySimulationX.Viewer.Projection;
 using UnitySimulationX.Viewer.Tools;
 
 namespace UnitySimulationX.Viewer.Selection
@@ -44,7 +45,7 @@ namespace UnitySimulationX.Viewer.Selection
             }
 
             if (!ServiceLocator.TryResolve<ISelectionService>(out var selection) ||
-                !ServiceLocator.TryResolve<ISceneObjectMapper>(out _))
+                !ServiceLocator.TryResolve<ISceneProjectionService>(out _))
                 return;
 
             var pointerPosition = GetPointerPosition();

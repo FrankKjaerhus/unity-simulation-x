@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using UnitySimulationX.Core;
 using UnitySimulationX.SceneModel;
+using UnitySimulationX.Viewer.Projection;
 using UnitySimulationX.Viewer.Selection;
 
 namespace UnitySimulationX.UI.Hierarchy
@@ -20,7 +21,7 @@ namespace UnitySimulationX.UI.Hierarchy
 
         SceneRegistry _registry;
         ISelectionService _selection;
-        ISceneObjectMapper _mapper;
+        ISceneProjectionService _projection;
         string _filter = string.Empty;
         string _selectedReparentTarget;
         string _draggedObjectId;
@@ -47,7 +48,7 @@ namespace UnitySimulationX.UI.Hierarchy
 
             _registry = ServiceLocator.Resolve<SceneRegistry>();
             _selection = ServiceLocator.Resolve<ISelectionService>();
-            _mapper = ServiceLocator.Resolve<ISceneObjectMapper>();
+            _projection = ServiceLocator.Resolve<ISceneProjectionService>();
 
             _searchField?.RegisterValueChangedCallback(evt =>
             {
@@ -141,9 +142,7 @@ namespace UnitySimulationX.UI.Hierarchy
             {
                 model.Name = evt.newValue;
                 _registry.Update(model);
-                var go = _mapper.GetGameObject(model.Id);
-                if (go != null)
-                    _mapper.UpdateGameObject(model, go);
+                _projection.UpdateProjection(model);
                 EventBus.Publish(new SceneObjectChangedEvent { ObjectId = model.Id, Model = model });
             });
 
@@ -152,9 +151,7 @@ namespace UnitySimulationX.UI.Hierarchy
             {
                 model.Visible = evt.newValue;
                 _registry.Update(model);
-                var go = _mapper.GetGameObject(model.Id);
-                if (go != null)
-                    _mapper.UpdateGameObject(model, go);
+                _projection.UpdateProjection(model);
                 EventBus.Publish(new SceneObjectChangedEvent { ObjectId = model.Id, Model = model });
             });
 
@@ -258,9 +255,8 @@ namespace UnitySimulationX.UI.Hierarchy
         void SyncReparentedObject(string objectId)
         {
             var model = _registry.Get(objectId);
-            var go = _mapper.GetGameObject(objectId);
-            if (model != null && go != null)
-                _mapper.UpdateGameObject(model, go);
+            if (model != null)
+                _projection.UpdateProjection(model);
 
             EventBus.Publish(new HierarchyChangedEvent());
             EventBus.Publish(new SceneObjectChangedEvent { ObjectId = objectId, Model = model });
@@ -278,7 +274,7 @@ namespace UnitySimulationX.UI.Hierarchy
             var ids = _selection.SelectedObjectIds.ToList();
             foreach (var id in ids)
             {
-                _mapper.DestroyGameObject(id);
+                _projection.RemoveProjection(id);
                 _registry.Remove(id);
             }
 
