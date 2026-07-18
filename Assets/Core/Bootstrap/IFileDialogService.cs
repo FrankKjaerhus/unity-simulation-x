@@ -2,8 +2,8 @@ namespace UnitySimulationX.Core
 {
     public interface IFileDialogService
     {
-        string OpenProjectPath();
-        string SaveProjectPath(string currentPath);
+        string OpenProjectFolder();
+        string SaveProjectFolder(string currentProjectRoot);
         string OpenImportPath();
     }
 }

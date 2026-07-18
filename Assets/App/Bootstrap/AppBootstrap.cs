@@ -34,6 +34,7 @@ namespace UnitySimulationX.App
         SceneRegistry _registry;
         SceneProjectionService _projection;
         SceneEditService _edits;
+        IProjectWorkspace _projectWorkspace;
         IShellLayoutService _layoutService;
         string _sceneRootModelId;
 
@@ -71,8 +72,10 @@ namespace UnitySimulationX.App
             ServiceLocator.Register<IImportSceneService>(
                 new ImportSceneService(importerRegistry, _edits, _projection));
 
+            _projectWorkspace = new ProjectWorkspace();
+            ServiceLocator.Register<IProjectWorkspace>(_projectWorkspace);
             ServiceLocator.Register<IProjectPersistenceService>(
-                new ProjectPersistenceService(_edits));
+                new ProjectPersistenceService(_edits, _projectWorkspace));
             ServiceLocator.Register<IFileDialogService>(new NativeFileDialogService());
             ServiceLocator.Register<IViewportToolService>(new ViewportToolService());
 
@@ -192,6 +195,8 @@ namespace UnitySimulationX.App
         {
             if (_layoutService != null)
                 _layoutService.LayoutChanged -= ConfigureCameraViewport;
+
+            _projectWorkspace?.Dispose();
         }
 
         void CreateDefaultRoot()

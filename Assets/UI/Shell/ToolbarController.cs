@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using UnityEngine;
 using UnityEngine.UIElements;
 using UnitySimulationX.Core;
@@ -81,7 +82,7 @@ namespace UnitySimulationX.UI.Shell
             button?.EnableInClassList("tool-button-active", active);
         }
 
-        void LoadProject()
+        async void LoadProject()
         {
             try
             {
@@ -89,9 +90,12 @@ namespace UnitySimulationX.UI.Shell
                     !ServiceLocator.TryResolve<IProjectPersistenceService>(out var projects))
                     return;
 
-                var path = dialogs.OpenProjectPath();
-                if (!string.IsNullOrWhiteSpace(path))
-                    projects.Load(path);
+                var projectRoot = dialogs.OpenProjectFolder();
+                if (string.IsNullOrWhiteSpace(projectRoot))
+                    return;
+
+                var result = await projects.LoadAsync(projectRoot, CancellationToken.None);
+                LogProjectResult("Load project", result);
             }
             catch (Exception ex)
             {
@@ -99,7 +103,7 @@ namespace UnitySimulationX.UI.Shell
             }
         }
 
-        void SaveProject()
+        async void SaveProject()
         {
             try
             {
@@ -107,9 +111,18 @@ namespace UnitySimulationX.UI.Shell
                     !ServiceLocator.TryResolve<IProjectPersistenceService>(out var projects))
                     return;
 
-                var path = dialogs.SaveProjectPath(projects.CurrentPath);
-                if (!string.IsNullOrWhiteSpace(path))
-                    projects.Save(path);
+                var projectRoot = dialogs.SaveProjectFolder(projects.CurrentProjectRoot);
+                if (string.IsNullOrWhiteSpace(projectRoot))
+                    return;
+
+                var result = string.Equals(
+                    projectRoot,
+                    projects.CurrentProjectRoot,
+                    StringComparison.Ordinal)
+                    ? await projects.SaveAsync(CancellationToken.None)
+                    : await projects.SaveAsAsync(projectRoot, CancellationToken.None);
+
+                LogProjectResult("Save project", result);
             }
             catch (Exception ex)
             {
@@ -133,6 +146,28 @@ namespace UnitySimulationX.UI.Shell
             {
                 Debug.LogError($"Import failed: {ex.Message}");
             }
+        }
+
+        static void LogProjectResult(string operationName, ProjectOperationResult result)
+        {
+            if (result == null)
+            {
+                Debug.LogError($"{operationName} failed.");
+                return;
+            }
+
+            var issues = result.Issues ?? Array.Empty<ProjectIssue>();
+            foreach (var issue in issues)
+            {
+                var message = $"{operationName} [{issue.Code}]: {issue.Message}";
+                if (issue.IsError)
+                    Debug.LogError(message);
+                else
+                    Debug.LogWarning(message);
+            }
+
+            if (!result.Succeeded && issues.Count == 0)
+                Debug.LogError($"{operationName} failed.");
         }
     }
 }

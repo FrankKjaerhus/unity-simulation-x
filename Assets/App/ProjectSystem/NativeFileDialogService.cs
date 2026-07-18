@@ -10,27 +10,31 @@ namespace UnitySimulationX.App.ProjectSystem
 {
     public sealed class NativeFileDialogService : IFileDialogService
     {
-        const string ProjectExtension = "viewer.json";
+        const string LastProjectRootKey = "UnitySimulationX.LastProjectRoot";
 
-        public string OpenProjectPath()
+        public string OpenProjectFolder()
         {
 #if UNITY_EDITOR
-            return EditorUtility.OpenFilePanel("Load Unity Simulation X Project", Application.dataPath, "json");
+            var directory = PlayerPrefs.GetString(LastProjectRootKey, DefaultProjectRoot());
+            return EditorUtility.OpenFolderPanel("Load Unity Simulation X Project", directory, string.Empty);
 #else
-            return PlayerPrefs.GetString("UnitySimulationX.LastProjectPath", DefaultProjectPath());
+            return PlayerPrefs.GetString(LastProjectRootKey, DefaultProjectRoot());
 #endif
         }
 
-        public string SaveProjectPath(string currentPath)
+        public string SaveProjectFolder(string currentProjectRoot)
         {
 #if UNITY_EDITOR
-            var directory = string.IsNullOrEmpty(currentPath) ? Application.dataPath : Path.GetDirectoryName(currentPath);
-            var fileName = string.IsNullOrEmpty(currentPath) ? "project.viewer.json" : Path.GetFileName(currentPath);
-            return EditorUtility.SaveFilePanel("Save Unity Simulation X Project", directory, fileName, "json");
+            var directory = string.IsNullOrEmpty(currentProjectRoot)
+                ? DefaultProjectRoot()
+                : currentProjectRoot;
+            return EditorUtility.OpenFolderPanel("Save Unity Simulation X Project", directory, string.Empty);
 #else
-            var path = string.IsNullOrEmpty(currentPath) ? DefaultProjectPath() : currentPath;
-            PlayerPrefs.SetString("UnitySimulationX.LastProjectPath", path);
-            return path;
+            var root = string.IsNullOrEmpty(currentProjectRoot)
+                ? DefaultProjectRoot()
+                : currentProjectRoot;
+            PlayerPrefs.SetString(LastProjectRootKey, root);
+            return root;
 #endif
         }
 
@@ -43,9 +47,9 @@ namespace UnitySimulationX.App.ProjectSystem
 #endif
         }
 
-        static string DefaultProjectPath()
+        static string DefaultProjectRoot()
         {
-            return Path.Combine(Application.persistentDataPath, ProjectExtension);
+            return Path.Combine(Application.persistentDataPath, "Project");
         }
     }
 }
