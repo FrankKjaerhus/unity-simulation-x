@@ -16,5 +16,19 @@ namespace UnitySimulationX.SceneModel
         public string Preset;
         public bool UserOverride;
         public bool StatusOverrideEnabled = true;
+
+        public MaterialDefinition Clone()
+        {
+            return new MaterialDefinition
+            {
+                BaseColor = BaseColor,
+                Alpha = Alpha,
+                Metallic = Metallic,
+                Roughness = Roughness,
+                Preset = Preset,
+                UserOverride = UserOverride,
+                StatusOverrideEnabled = StatusOverrideEnabled
+            };
+        }
     }
 }
