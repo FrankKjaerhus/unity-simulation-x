@@ -3,6 +3,7 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 using UnitySimulationX.Core;
+using UnitySimulationX.Editing;
 using UnitySimulationX.SceneModel;
 using UnitySimulationX.Viewer.Projection;
 using UnitySimulationX.Viewer.Selection;
@@ -28,10 +29,11 @@ namespace UnitySimulationX.Tests.PlayMode
             _projection = new SceneProjectionService(_root.transform, _registry);
             _selection = new SelectionService(_registry, _eventBus);
 
-            ServiceLocator.Register(_registry);
+            ServiceLocator.Register<ISceneRegistryRead>(_registry);
             ServiceLocator.Register<ISceneProjectionService>(_projection);
             ServiceLocator.Register<ISelectionService>(_selection);
             ServiceLocator.Register<IEventBus>(_eventBus);
+            ServiceLocator.Register<ISceneEditService>(new SceneEditService(_registry, _projection, _eventBus));
 
             var model = new SceneObjectModel
             {

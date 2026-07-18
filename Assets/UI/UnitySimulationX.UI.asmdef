@@ -3,6 +3,7 @@
     "rootNamespace": "UnitySimulationX.UI",
     "references": [
         "UnitySimulationX.Core",
+        "UnitySimulationX.Editing",
         "UnitySimulationX.SceneModel",
         "UnitySimulationX.Viewer",
         "UnitySimulationX.Import"

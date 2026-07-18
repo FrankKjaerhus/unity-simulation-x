@@ -1,26 +1,18 @@
 using System.IO;
 using UnityEngine;
 using UnitySimulationX.Core;
-using UnitySimulationX.SceneModel;
+using UnitySimulationX.Editing;
 using UnitySimulationX.SceneModel.Serialization;
-using UnitySimulationX.Viewer.Projection;
 
 namespace UnitySimulationX.App.ProjectSystem
 {
     public sealed class ProjectPersistenceService : IProjectPersistenceService
     {
-        readonly SceneRegistry _registry;
-        readonly ISceneProjectionService _projection;
-        readonly IEventBus _eventBus;
+        readonly ISceneEditService _edits;
 
-        public ProjectPersistenceService(
-            SceneRegistry registry,
-            ISceneProjectionService projection,
-            IEventBus eventBus)
+        public ProjectPersistenceService(ISceneEditService edits)
         {
-            _registry = registry;
-            _projection = projection;
-            _eventBus = eventBus;
+            _edits = edits;
         }
 
         public string CurrentPath { get; private set; }
@@ -30,7 +22,7 @@ namespace UnitySimulationX.App.ProjectSystem
             if (string.IsNullOrWhiteSpace(path))
                 return;
 
-            var document = ProjectSerializer.CreateDocument(_registry);
+            var document = ProjectSerializer.CreateDocument(_edits.Registry);
             var json = JsonUtility.ToJson(document, prettyPrint: true);
             File.WriteAllText(path, json);
             CurrentPath = path;
@@ -44,10 +36,9 @@ namespace UnitySimulationX.App.ProjectSystem
 
             var json = File.ReadAllText(path);
             var document = JsonUtility.FromJson<ProjectViewerDocument>(json);
-            ProjectSerializer.ApplyDocument(document, _registry, _projection);
+            var snapshots = ProjectSerializer.CreateSnapshots(document);
+            _edits.ReplaceScene(snapshots);
             CurrentPath = path;
-
-            _eventBus.Publish(new HierarchyChangedEvent());
             Debug.Log($"Loaded project: {path}");
         }
     }

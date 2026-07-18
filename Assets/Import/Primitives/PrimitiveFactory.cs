@@ -1,32 +1,28 @@
 using System;
-using UnitySimulationX.Core;
+using UnitySimulationX.Editing;
 using UnitySimulationX.SceneModel;
-using UnitySimulationX.Viewer.Projection;
 
 namespace UnitySimulationX.Import
 {
     public sealed class PrimitiveFactory : IPrimitiveFactory
     {
-        readonly SceneRegistry _registry;
-        readonly ISceneProjectionService _projection;
-        readonly IEventBus _eventBus;
+        readonly ISceneEditService _edits;
 
-        public PrimitiveFactory(SceneRegistry registry, ISceneProjectionService projection, IEventBus eventBus)
+        public PrimitiveFactory(ISceneEditService edits)
         {
-            _registry = registry;
-            _projection = projection;
-            _eventBus = eventBus;
+            _edits = edits;
         }
 
         public SceneObjectModel CreatePrimitive(PrimitiveMeshType type, PrimitiveSettings settings)
         {
             settings ??= new PrimitiveSettings();
 
-            var model = new SceneObjectModel
+            var draft = new SceneObjectDraft
             {
                 Id = Guid.NewGuid().ToString("N"),
                 Name = string.IsNullOrWhiteSpace(settings.Name) ? type.ToString() : settings.Name,
                 Type = SceneObjectType.Primitive,
+                TypeId = SceneObjectTypeIds.Primitive,
                 ParentId = settings.ParentId,
                 Transform = new TransformData
                 {
@@ -38,13 +34,11 @@ namespace UnitySimulationX.Import
                 PrimitiveMeshTypeKey = type.ToString()
             };
 
-            _registry.Add(model);
-            _projection.CreateProjection(model);
+            var result = _edits.Create(draft);
+            if (!result.Succeeded)
+                return null;
 
-            _eventBus.Publish(new HierarchyChangedEvent());
-            _eventBus.Publish(new SceneObjectChangedEvent { ObjectId = model.Id, Model = model });
-
-            return model;
+            return _edits.Registry.Get(draft.Id);
         }
     }
 }

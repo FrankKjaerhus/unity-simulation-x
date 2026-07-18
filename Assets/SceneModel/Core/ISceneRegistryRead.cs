@@ -11,6 +11,5 @@ namespace UnitySimulationX.SceneModel
         IReadOnlyCollection<SceneObjectModel> GetAll();
         IReadOnlyList<string> GetChildrenIds(string parentId);
         bool Contains(string id);
-        event Action HierarchyChanged;
     }
 }

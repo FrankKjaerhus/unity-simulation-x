@@ -1,7 +1,7 @@
 using System.IO;
 using System.Threading.Tasks;
 using UnityEngine;
-using UnitySimulationX.Core;
+using UnitySimulationX.Editing;
 using UnitySimulationX.SceneModel;
 using UnitySimulationX.Viewer.Projection;
 
@@ -10,20 +10,17 @@ namespace UnitySimulationX.Import
     public sealed class ImportSceneService : IImportSceneService
     {
         readonly ImporterRegistry _importers;
-        readonly SceneRegistry _registry;
+        readonly ISceneEditService _edits;
         readonly ISceneProjectionService _projection;
-        readonly IEventBus _eventBus;
 
         public ImportSceneService(
             ImporterRegistry importers,
-            SceneRegistry registry,
-            ISceneProjectionService projection,
-            IEventBus eventBus)
+            ISceneEditService edits,
+            ISceneProjectionService projection)
         {
             _importers = importers;
-            _registry = registry;
+            _edits = edits;
             _projection = projection;
-            _eventBus = eventBus;
         }
 
         public async Task ImportFileAsync(string path)
@@ -43,10 +40,43 @@ namespace UnitySimulationX.Import
                 return;
 
             result.RootObject.DomainProperties["SourcePath"] = path;
-            _registry.Add(result.RootObject);
-            var root = result.ImportedGameObject != null
-                ? RegisterImportedGameObject(result.RootObject, result.ImportedGameObject)
-                : CreateImportedProjection(result.RootObject);
+
+            var draft = new SceneObjectDraft
+            {
+                Id = result.RootObject.Id,
+                Name = result.RootObject.Name,
+                Type = result.RootObject.Type,
+                TypeId = result.RootObject.TypeId,
+                ParentId = result.RootObject.ParentId,
+                Transform = result.RootObject.Transform?.Clone() ?? new TransformData(),
+                Visible = result.RootObject.Visible,
+                Material = result.RootObject.Material?.Clone() ?? new MaterialDefinition(),
+                AssetId = result.RootObject.AssetId,
+                PrimitiveMeshTypeKey = result.RootObject.PrimitiveMeshTypeKey,
+                SkipProjectionCreate = result.ImportedGameObject != null
+            };
+
+            GameObject root = null;
+            if (result.ImportedGameObject != null)
+            {
+                _projection.RegisterExistingTarget(draft.Id, result.ImportedGameObject);
+                var createResult = _edits.Create(draft);
+                if (!createResult.Succeeded)
+                {
+                    _projection.RemoveProjection(draft.Id);
+                    return;
+                }
+
+                root = result.ImportedGameObject;
+            }
+            else
+            {
+                var createResult = _edits.Create(draft);
+                if (!createResult.Succeeded)
+                    return;
+
+                root = _projection.GetGameObject(draft.Id);
+            }
 
             if (root != null && result.Meshes.Count > 0)
                 ApplyMesh(root, result.Meshes[0], result.Materials.Count > 0 ? result.Materials[0] : null);
@@ -57,8 +87,6 @@ namespace UnitySimulationX.Import
             foreach (var warning in result.Warnings)
                 Debug.LogWarning($"Import warning: {warning.Message}");
 
-            _eventBus.Publish(new HierarchyChangedEvent());
-            _eventBus.Publish(new SceneObjectChangedEvent { ObjectId = result.RootObject.Id, Model = result.RootObject });
             Debug.Log($"Imported 3D file: {path}");
         }
 
@@ -121,18 +149,6 @@ namespace UnitySimulationX.Import
                 var collider = filter.gameObject.AddComponent<MeshCollider>();
                 collider.sharedMesh = filter.sharedMesh;
             }
-        }
-
-        GameObject RegisterImportedGameObject(SceneObjectModel model, GameObject target)
-        {
-            _projection.RegisterExistingTarget(model.Id, target);
-            return target;
-        }
-
-        GameObject CreateImportedProjection(SceneObjectModel model)
-        {
-            _projection.CreateProjection(model);
-            return _projection.GetGameObject(model.Id);
         }
     }
 }

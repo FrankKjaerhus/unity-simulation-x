@@ -29,7 +29,7 @@ namespace UnitySimulationX.Viewer.Camera
             FocusBounds(bounds.Value, padding);
         }
 
-        public void FrameAll(SceneRegistry registry, float padding = 2f)
+        public void FrameAll(ISceneRegistryRead registry, float padding = 2f)
         {
             var ids = new List<string>();
             foreach (var model in registry.GetAll())

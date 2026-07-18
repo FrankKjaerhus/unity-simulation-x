@@ -4,8 +4,8 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.UIElements;
 using UnitySimulationX.Core;
+using UnitySimulationX.Editing;
 using UnitySimulationX.SceneModel;
-using UnitySimulationX.Viewer.Projection;
 using UnitySimulationX.Viewer.Selection;
 
 namespace UnitySimulationX.UI.Properties
@@ -16,12 +16,12 @@ namespace UnitySimulationX.UI.Properties
         readonly VisualElement _fieldsContainer;
         readonly List<IPropertyProvider> _providers = new();
 
-        SceneRegistry _registry;
+        ISceneRegistryRead _registry;
         ISelectionService _selection;
-        ISceneProjectionService _projection;
+        ISceneEditService _edits;
         IEventBus _eventBus;
         IDisposable _selectionSubscription;
-        IDisposable _sceneObjectSubscription;
+        IDisposable _sceneChangedSubscription;
         SceneObjectModel _current;
 
         public PropertiesPanelController(VisualElement root)
@@ -39,13 +39,13 @@ namespace UnitySimulationX.UI.Properties
             if (_root == null || _fieldsContainer == null)
                 return;
 
-            _registry = ServiceLocator.Resolve<SceneRegistry>();
+            _registry = ServiceLocator.Resolve<ISceneRegistryRead>();
             _selection = ServiceLocator.Resolve<ISelectionService>();
-            _projection = ServiceLocator.Resolve<ISceneProjectionService>();
+            _edits = ServiceLocator.Resolve<ISceneEditService>();
             _eventBus = ServiceLocator.Resolve<IEventBus>();
 
             _selectionSubscription = _eventBus.Subscribe<SelectionChangedEvent>(OnSelectionChanged);
-            _sceneObjectSubscription = _eventBus.Subscribe<SceneObjectChangedEvent>(OnSceneObjectChanged);
+            _sceneChangedSubscription = _eventBus.Subscribe<SceneChangedEvent>(OnSceneChanged);
 
             Refresh();
         }
@@ -54,16 +54,20 @@ namespace UnitySimulationX.UI.Properties
         {
             _selectionSubscription?.Dispose();
             _selectionSubscription = null;
-            _sceneObjectSubscription?.Dispose();
-            _sceneObjectSubscription = null;
+            _sceneChangedSubscription?.Dispose();
+            _sceneChangedSubscription = null;
         }
 
         void OnSelectionChanged(SelectionChangedEvent _) => Refresh();
 
-        void OnSceneObjectChanged(SceneObjectChangedEvent evt)
+        void OnSceneChanged(SceneChangedEvent evt)
         {
-            if (_current != null && evt.ObjectId == _current.Id)
+            if (_current != null &&
+                evt.ChangeSet?.ObjectIds != null &&
+                evt.ChangeSet.ObjectIds.Contains(_current.Id))
+            {
                 Refresh();
+            }
         }
 
         void Refresh()
@@ -154,26 +158,35 @@ namespace UnitySimulationX.UI.Properties
             switch (key)
             {
                 case "name":
-                    _current.Name = value as string;
+                    _edits.Rename(_current.Id, value as string);
                     break;
                 case "position":
-                    _current.Transform.Position = (Vector3)value;
+                {
+                    var transform = _current.Transform?.Clone() ?? new TransformData();
+                    transform.Position = (Vector3)value;
+                    _edits.SetTransform(_current.Id, transform);
                     break;
+                }
                 case "rotation":
-                    _current.Transform.RotationEuler = (Vector3)value;
+                {
+                    var transform = _current.Transform?.Clone() ?? new TransformData();
+                    transform.RotationEuler = (Vector3)value;
+                    _edits.SetTransform(_current.Id, transform);
                     break;
+                }
                 case "scale":
-                    _current.Transform.Scale = (Vector3)value;
+                {
+                    var transform = _current.Transform?.Clone() ?? new TransformData();
+                    transform.Scale = (Vector3)value;
+                    _edits.SetTransform(_current.Id, transform);
                     break;
+                }
                 case "visible":
-                    _current.Visible = (bool)value;
+                    _edits.SetVisible(_current.Id, (bool)value);
                     break;
             }
 
-            _registry.Update(_current);
-            _projection.UpdateProjection(_current);
-
-            _eventBus.Publish(new SceneObjectChangedEvent { ObjectId = _current.Id, Model = _current });
+            _current = _registry.Get(_current.Id);
         }
     }
 }

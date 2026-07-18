@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnitySimulationX.Core;
+using UnitySimulationX.Editing;
 using UnitySimulationX.SceneModel;
 using UnitySimulationX.Viewer;
 using UnitySimulationX.Viewer.Projection;
@@ -19,11 +20,15 @@ namespace UnitySimulationX.Viewer.Gizmos
         {
             public string ObjectId;
             public Vector3 WorldStartPosition;
+            public TransformData OriginalTransform;
+            public TransformData PreviewTransform;
             public Transform Parent;
         }
 
         UnityEngine.Camera _camera;
         IEventBus _eventBus;
+        ISceneEditService _edits;
+        ISceneProjectionService _projection;
         bool _grabbing;
         bool _suppressSelectionClick;
         Plane _grabPlane;
@@ -46,6 +51,8 @@ namespace UnitySimulationX.Viewer.Gizmos
         {
             _camera = GetComponent<UnityEngine.Camera>();
             ServiceLocator.TryResolve<IEventBus>(out _eventBus);
+            ServiceLocator.TryResolve<ISceneEditService>(out _edits);
+            ServiceLocator.TryResolve<ISceneProjectionService>(out _projection);
             ServiceLocator.Register<IGrabService>(this);
         }
 
@@ -92,21 +99,25 @@ namespace UnitySimulationX.Viewer.Gizmos
         {
             if (!ServiceLocator.TryResolve<ISelectionService>(out var selection) ||
                 selection.SelectedObjectIds.Count == 0 ||
-                !ServiceLocator.TryResolve<ISceneProjectionService>(out var mapper))
+                _projection == null ||
+                _edits == null)
                 return;
 
             _grabEntries.Clear();
 
             foreach (var objectId in selection.SelectedObjectIds)
             {
-                var go = mapper.GetGameObject(objectId);
-                if (go == null)
+                var model = _edits.Registry.Get(objectId);
+                var go = _projection.GetGameObject(objectId);
+                if (model == null || go == null)
                     continue;
 
                 _grabEntries.Add(new GrabEntry
                 {
                     ObjectId = objectId,
                     WorldStartPosition = go.transform.position,
+                    OriginalTransform = model.Transform?.Clone() ?? new TransformData(),
+                    PreviewTransform = model.Transform?.Clone() ?? new TransformData(),
                     Parent = go.transform.parent
                 });
             }
@@ -114,7 +125,7 @@ namespace UnitySimulationX.Viewer.Gizmos
             if (_grabEntries.Count == 0)
                 return;
 
-            var anchor = _grabEntries[0].WorldStartPosition;
+            var anchor = _projection.GetGameObject(_grabEntries[0].ObjectId).transform.position;
             _grabPlane = new Plane(_camera.transform.forward, anchor);
 
             var ray = _camera.ScreenPointToRay(mouse.position.ReadValue());
@@ -128,8 +139,7 @@ namespace UnitySimulationX.Viewer.Gizmos
 
         void ContinueGrab(Mouse mouse)
         {
-            if (!ServiceLocator.TryResolve<SceneRegistry>(out var registry) ||
-                !ServiceLocator.TryResolve<ISceneProjectionService>(out var mapper))
+            if (_projection == null)
                 return;
 
             var ray = _camera.ScreenPointToRay(mouse.position.ReadValue());
@@ -141,40 +151,37 @@ namespace UnitySimulationX.Viewer.Gizmos
 
             foreach (var entry in _grabEntries)
             {
-                var model = registry.Get(entry.ObjectId);
-                var go = mapper.GetGameObject(entry.ObjectId);
-                if (model == null || go == null)
+                var go = _projection.GetGameObject(entry.ObjectId);
+                if (go == null)
                     continue;
 
                 var newWorld = entry.WorldStartPosition + delta;
-                model.Transform.Position = entry.Parent != null
-                    ? entry.Parent.InverseTransformPoint(newWorld)
-                    : newWorld;
 
-                mapper.UpdateProjection(model);
+                entry.PreviewTransform = entry.Parent != null
+                    ? new TransformData
+                    {
+                        Position = entry.Parent.InverseTransformPoint(newWorld),
+                        RotationEuler = entry.OriginalTransform.RotationEuler,
+                        Scale = entry.OriginalTransform.Scale
+                    }
+                    : new TransformData
+                    {
+                        Position = newWorld,
+                        RotationEuler = entry.OriginalTransform.RotationEuler,
+                        Scale = entry.OriginalTransform.Scale
+                    };
+
+                _projection.PreviewTransform(entry.ObjectId, entry.PreviewTransform);
             }
         }
 
         void ConfirmGrab()
         {
-            if (!_grabbing)
+            if (!_grabbing || _edits == null)
                 return;
 
-            if (ServiceLocator.TryResolve<SceneRegistry>(out var registry))
-            {
-                foreach (var entry in _grabEntries)
-                {
-                    var model = registry.Get(entry.ObjectId);
-                    if (model == null)
-                        continue;
-
-                    _eventBus?.Publish(new SceneObjectChangedEvent
-                    {
-                        ObjectId = model.Id,
-                        Model = model
-                    });
-                }
-            }
+            foreach (var entry in _grabEntries)
+                _edits.SetTransform(entry.ObjectId, entry.PreviewTransform);
 
             _suppressSelectionClick = true;
             EndGrab();
@@ -185,25 +192,10 @@ namespace UnitySimulationX.Viewer.Gizmos
             if (!_grabbing)
                 return;
 
-            if (!ServiceLocator.TryResolve<SceneRegistry>(out var registry) ||
-                !ServiceLocator.TryResolve<ISceneProjectionService>(out var mapper))
+            if (_projection != null)
             {
-                EndGrab();
-                return;
-            }
-
-            foreach (var entry in _grabEntries)
-            {
-                var model = registry.Get(entry.ObjectId);
-                var go = mapper.GetGameObject(entry.ObjectId);
-                if (model == null || go == null)
-                    continue;
-
-                model.Transform.Position = entry.Parent != null
-                    ? entry.Parent.InverseTransformPoint(entry.WorldStartPosition)
-                    : entry.WorldStartPosition;
-
-                mapper.UpdateProjection(model);
+                foreach (var entry in _grabEntries)
+                    _projection.PreviewTransform(entry.ObjectId, entry.OriginalTransform);
             }
 
             EndGrab();

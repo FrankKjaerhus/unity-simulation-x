@@ -7,11 +7,11 @@ namespace UnitySimulationX.Viewer.Selection
 {
     public sealed class SelectionService : ISelectionService
     {
-        readonly SceneRegistry _registry;
+        readonly ISceneRegistryRead _registry;
         readonly IEventBus _eventBus;
         readonly List<string> _selected = new();
 
-        public SelectionService(SceneRegistry registry, IEventBus eventBus)
+        public SelectionService(ISceneRegistryRead registry, IEventBus eventBus)
         {
             _registry = registry;
             _eventBus = eventBus;

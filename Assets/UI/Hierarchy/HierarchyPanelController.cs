@@ -4,8 +4,8 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.UIElements;
 using UnitySimulationX.Core;
+using UnitySimulationX.Editing;
 using UnitySimulationX.SceneModel;
-using UnitySimulationX.Viewer.Projection;
 using UnitySimulationX.Viewer.Selection;
 
 namespace UnitySimulationX.UI.Hierarchy
@@ -20,12 +20,12 @@ namespace UnitySimulationX.UI.Hierarchy
         readonly Button _reparentButton;
         readonly Button _deleteButton;
 
-        SceneRegistry _registry;
+        ISceneRegistryRead _registry;
         ISelectionService _selection;
-        ISceneProjectionService _projection;
+        ISceneEditService _edits;
         IEventBus _eventBus;
         IDisposable _selectionSubscription;
-        IDisposable _hierarchySubscription;
+        IDisposable _sceneChangedSubscription;
         string _filter = string.Empty;
         string _selectedReparentTarget;
         string _draggedObjectId;
@@ -50,9 +50,9 @@ namespace UnitySimulationX.UI.Hierarchy
             if (_root == null || _treeContainer == null)
                 return;
 
-            _registry = ServiceLocator.Resolve<SceneRegistry>();
+            _registry = ServiceLocator.Resolve<ISceneRegistryRead>();
             _selection = ServiceLocator.Resolve<ISelectionService>();
-            _projection = ServiceLocator.Resolve<ISceneProjectionService>();
+            _edits = ServiceLocator.Resolve<ISceneEditService>();
             _eventBus = ServiceLocator.Resolve<IEventBus>();
 
             _searchField?.RegisterValueChangedCallback(evt =>
@@ -65,24 +65,20 @@ namespace UnitySimulationX.UI.Hierarchy
             _deleteButton?.RegisterCallback<ClickEvent>(_ => DeleteSelected());
 
             _selectionSubscription = _eventBus.Subscribe<SelectionChangedEvent>(OnSelectionChanged);
-            _hierarchySubscription = _eventBus.Subscribe<HierarchyChangedEvent>(OnHierarchyChanged);
-            _registry.HierarchyChanged += Rebuild;
+            _sceneChangedSubscription = _eventBus.Subscribe<SceneChangedEvent>(_ => Rebuild());
 
             Rebuild();
         }
 
         public void Unbind()
         {
-            if (_registry != null)
-                _registry.HierarchyChanged -= Rebuild;
             _selectionSubscription?.Dispose();
             _selectionSubscription = null;
-            _hierarchySubscription?.Dispose();
-            _hierarchySubscription = null;
+            _sceneChangedSubscription?.Dispose();
+            _sceneChangedSubscription = null;
         }
 
         void OnSelectionChanged(SelectionChangedEvent _) => Rebuild();
-        void OnHierarchyChanged(HierarchyChangedEvent _) => Rebuild();
 
         void Rebuild()
         {
@@ -145,22 +141,10 @@ namespace UnitySimulationX.UI.Hierarchy
 
             var nameField = new TextField { value = model.Name };
             nameField.AddToClassList("hierarchy-name");
-            nameField.RegisterValueChangedCallback(evt =>
-            {
-                model.Name = evt.newValue;
-                _registry.Update(model);
-                _projection.UpdateProjection(model);
-                _eventBus.Publish(new SceneObjectChangedEvent { ObjectId = model.Id, Model = model });
-            });
+            nameField.RegisterValueChangedCallback(evt => _edits.Rename(model.Id, evt.newValue));
 
             var visibilityToggle = new Toggle { value = model.Visible };
-            visibilityToggle.RegisterValueChangedCallback(evt =>
-            {
-                model.Visible = evt.newValue;
-                _registry.Update(model);
-                _projection.UpdateProjection(model);
-                _eventBus.Publish(new SceneObjectChangedEvent { ObjectId = model.Id, Model = model });
-            });
+            visibilityToggle.RegisterValueChangedCallback(evt => _edits.SetVisible(model.Id, evt.newValue));
 
             if (_selection.IsSelected(model.Id))
                 row.AddToClassList("hierarchy-row-selected");
@@ -248,25 +232,12 @@ namespace UnitySimulationX.UI.Hierarchy
                 newParentId = target.Id;
             }
 
-            _registry.Reparent(objectId, newParentId);
-
-            SyncReparentedObject(objectId);
+            _edits.Reparent(objectId, newParentId);
         }
 
         void ReparentObject(string objectId, string newParentId)
         {
-            _registry.Reparent(objectId, newParentId);
-            SyncReparentedObject(objectId);
-        }
-
-        void SyncReparentedObject(string objectId)
-        {
-            var model = _registry.Get(objectId);
-            if (model != null)
-                _projection.UpdateProjection(model);
-
-            _eventBus.Publish(new HierarchyChangedEvent());
-            _eventBus.Publish(new SceneObjectChangedEvent { ObjectId = objectId, Model = model });
+            _edits.Reparent(objectId, newParentId);
         }
 
         void ClearDragState()
@@ -280,13 +251,9 @@ namespace UnitySimulationX.UI.Hierarchy
         {
             var ids = _selection.SelectedObjectIds.ToList();
             foreach (var id in ids)
-            {
-                _projection.RemoveProjection(id);
-                _registry.Remove(id);
-            }
+                _edits.Remove(id);
 
             _selection.Clear();
-            _eventBus.Publish(new HierarchyChangedEvent());
             Rebuild();
         }
 

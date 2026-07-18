@@ -130,7 +130,7 @@ namespace UnitySimulationX.Viewer.Camera
 
             if (keyboard.homeKey.wasPressedThisFrame && !ViewportInputUtility.IsTextFieldFocused())
             {
-                if (ServiceLocator.TryResolve<SceneRegistry>(out var registry))
+                if (ServiceLocator.TryResolve<ISceneRegistryRead>(out var registry))
                     _focus.FrameAll(registry);
             }
         }

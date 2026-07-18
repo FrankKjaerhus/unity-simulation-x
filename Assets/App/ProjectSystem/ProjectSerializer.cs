@@ -10,7 +10,7 @@ namespace UnitySimulationX.App.ProjectSystem
 {
     public static class ProjectSerializer
     {
-        public static ProjectViewerDocument CreateDocument(SceneRegistry registry)
+        public static ProjectViewerDocument CreateDocument(ISceneRegistryRead registry)
         {
             var document = new ProjectViewerDocument();
             foreach (var model in registry.GetAll().OrderBy(m => string.IsNullOrEmpty(m.ParentId) ? 0 : 1))
@@ -19,7 +19,22 @@ namespace UnitySimulationX.App.ProjectSystem
             return document;
         }
 
-        public static void ApplyDocument(ProjectViewerDocument document, SceneRegistry registry, ISceneProjectionService projection)
+        public static List<SceneObjectModel> CreateSnapshots(ProjectViewerDocument document)
+        {
+            var snapshots = new List<SceneObjectModel>();
+            if (document?.scene?.objects == null)
+                return snapshots;
+
+            foreach (var data in document.scene.objects)
+                snapshots.Add(FromDocumentData(data));
+
+            return snapshots;
+        }
+
+        public static void ApplyDocument(
+            ProjectViewerDocument document,
+            SceneRegistry registry,
+            ISceneProjectionService projection)
         {
             if (document?.scene?.objects == null)
                 return;
@@ -63,7 +78,7 @@ namespace UnitySimulationX.App.ProjectSystem
             }
         }
 
-        static SceneObjectDocumentData ToDocumentData(SceneObjectModel model, SceneRegistry registry)
+        static SceneObjectDocumentData ToDocumentData(SceneObjectModel model, ISceneRegistryRead registry)
         {
             return new SceneObjectDocumentData
             {

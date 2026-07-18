@@ -4,8 +4,9 @@ using UnityEngine.EventSystems;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem.UI;
 #endif
-using UnitySimulationX.Core;
 using UnitySimulationX.App.ProjectSystem;
+using UnitySimulationX.Core;
+using UnitySimulationX.Editing;
 using UnitySimulationX.Import;
 using UnitySimulationX.SceneModel;
 using UnitySimulationX.UI;
@@ -32,6 +33,7 @@ namespace UnitySimulationX.App
 
         SceneRegistry _registry;
         SceneProjectionService _projection;
+        SceneEditService _edits;
         IShellLayoutService _layoutService;
         string _sceneRootModelId;
 
@@ -43,7 +45,7 @@ namespace UnitySimulationX.App
             ServiceLocator.Register<IEventBus>(eventBus);
 
             _registry = new SceneRegistry();
-            ServiceLocator.Register(_registry);
+            ServiceLocator.Register<ISceneRegistryRead>(_registry);
 
             var root = sceneRoot != null ? sceneRoot : new GameObject("SceneRoot").transform;
             if (sceneRoot == null)
@@ -52,10 +54,13 @@ namespace UnitySimulationX.App
             _projection = new SceneProjectionService(root, _registry);
             ServiceLocator.Register<ISceneProjectionService>(_projection);
 
+            _edits = new SceneEditService(_registry, _projection, eventBus);
+            ServiceLocator.Register<ISceneEditService>(_edits);
+
             var selection = new SelectionService(_registry, eventBus);
             ServiceLocator.Register<ISelectionService>(selection);
 
-            var primitiveFactory = new PrimitiveFactory(_registry, _projection, eventBus);
+            var primitiveFactory = new PrimitiveFactory(_edits);
             ServiceLocator.Register<IPrimitiveFactory>(primitiveFactory);
 
             var importerRegistry = new ImporterRegistry();
@@ -64,14 +69,12 @@ namespace UnitySimulationX.App
             importerRegistry.Register(new GltfSceneAssetImporter());
             ServiceLocator.Register(importerRegistry);
             ServiceLocator.Register<IImportSceneService>(
-                new ImportSceneService(importerRegistry, _registry, _projection, eventBus));
+                new ImportSceneService(importerRegistry, _edits, _projection));
 
             ServiceLocator.Register<IProjectPersistenceService>(
-                new ProjectPersistenceService(_registry, _projection, eventBus));
+                new ProjectPersistenceService(_edits));
             ServiceLocator.Register<IFileDialogService>(new NativeFileDialogService());
             ServiceLocator.Register<IViewportToolService>(new ViewportToolService());
-
-            _registry.HierarchyChanged += () => eventBus.Publish(new HierarchyChangedEvent());
 
             EnsureEventSystem();
             EnsureCamera();
@@ -196,16 +199,17 @@ namespace UnitySimulationX.App
             if (_registry.GetAll().Count > 0)
                 return;
 
-            var rootModel = new SceneObjectModel
+            var rootModel = new SceneObjectDraft
             {
                 Id = System.Guid.NewGuid().ToString("N"),
                 Name = "Scene",
-                Type = SceneObjectType.MachineFrame
+                Type = SceneObjectType.MachineFrame,
+                TypeId = SceneObjectTypeIds.Group
             };
 
-            _registry.Add(rootModel);
-            _projection.CreateProjection(rootModel);
-            _sceneRootModelId = rootModel.Id;
+            var result = _edits.Create(rootModel);
+            if (result.Succeeded)
+                _sceneRootModelId = rootModel.Id;
         }
 
         void AdoptAuthoredSceneObjects()
@@ -225,11 +229,12 @@ namespace UnitySimulationX.App
                 if (candidate.GetComponentInParent<SceneObjectIdComponent>() != null)
                     continue;
 
-                var model = new SceneObjectModel
+                var draft = new SceneObjectDraft
                 {
                     Id = System.Guid.NewGuid().ToString("N"),
                     Name = candidate.name,
                     Type = SceneObjectType.ImportedAsset,
+                    TypeId = SceneObjectTypeIds.ImportedModel,
                     ParentId = _sceneRootModelId,
                     Transform = new TransformData
                     {
@@ -237,11 +242,14 @@ namespace UnitySimulationX.App
                         RotationEuler = candidate.transform.localEulerAngles,
                         Scale = candidate.transform.localScale
                     },
-                    Visible = renderer.enabled
+                    Visible = renderer.enabled,
+                    SkipProjectionCreate = true
                 };
 
-                _registry.Add(model);
-                _projection.RegisterExistingTarget(model.Id, candidate);
+                _projection.RegisterExistingTarget(draft.Id, candidate);
+                var createResult = _edits.Create(draft);
+                if (!createResult.Succeeded)
+                    _projection.RemoveProjection(draft.Id);
             }
         }
 

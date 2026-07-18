@@ -10,8 +10,6 @@ namespace UnitySimulationX.SceneModel
         readonly List<string> _rootIds = new();
         readonly Dictionary<string, List<string>> _childrenByParent = new();
 
-        public event Action HierarchyChanged;
-
         public long Revision { get; private set; }
 
         public IReadOnlyList<string> RootIds => _rootIds.ToList();
@@ -38,7 +36,6 @@ namespace UnitySimulationX.SceneModel
             _objects[clone.Id] = clone;
             AttachToHierarchy(clone);
             BumpRevision();
-            HierarchyChanged?.Invoke();
         }
 
         public bool Remove(string id)
@@ -59,7 +56,6 @@ namespace UnitySimulationX.SceneModel
             }
 
             BumpRevision();
-            HierarchyChanged?.Invoke();
             return true;
         }
 
@@ -84,7 +80,6 @@ namespace UnitySimulationX.SceneModel
             model.ParentId = newParentId;
             AttachToHierarchy(model);
             BumpRevision();
-            HierarchyChanged?.Invoke();
         }
 
         public void Replace(string objectId, SceneObjectModel replacement)
@@ -127,7 +122,6 @@ namespace UnitySimulationX.SceneModel
             }
 
             BumpRevision();
-            HierarchyChanged?.Invoke();
         }
 
         public void Update(SceneObjectModel model) => Replace(model.Id, model);
