@@ -1,25 +1,31 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnitySimulationX.Editing;
 using UnitySimulationX.SceneModel;
 
 namespace UnitySimulationX.Viewer.Projection
 {
     public sealed class SceneProjectionService : ISceneProjectionService
     {
+        const string PrimitiveMeshComponentTypeId = "com.unitysimulationx.scene.primitive-mesh";
+
         readonly Dictionary<string, GameObject> _gameObjects = new();
         readonly Transform _sceneRoot;
         readonly ISceneRegistryRead _registry;
         readonly IImportedAssetProjectionProvider _importedAssetProjectionProvider;
+        readonly SceneComponentCodecRegistry _componentCodecs;
 
         public SceneProjectionService(
             Transform sceneRoot,
             ISceneRegistryRead registry,
-            IImportedAssetProjectionProvider importedAssetProjectionProvider = null)
+            IImportedAssetProjectionProvider importedAssetProjectionProvider = null,
+            SceneComponentCodecRegistry componentCodecs = null)
         {
             _sceneRoot = sceneRoot;
             _registry = registry;
             _importedAssetProjectionProvider = importedAssetProjectionProvider;
+            _componentCodecs = componentCodecs;
         }
 
         public Transform SceneRoot => _sceneRoot;
@@ -44,9 +50,9 @@ namespace UnitySimulationX.Viewer.Projection
             {
                 _importedAssetProjectionProvider?.TryApply(snapshot.AssetId, go);
             }
-            else if (!string.IsNullOrEmpty(snapshot.PrimitiveMeshTypeKey))
+            else if (TryGetPrimitiveMeshKey(snapshot, out var meshTypeKey))
             {
-                ApplyPrimitiveMesh(go, snapshot.PrimitiveMeshTypeKey);
+                ApplyPrimitiveMesh(go, meshTypeKey);
             }
 
             ApplyTransform(go.transform, snapshot.Transform);
@@ -89,6 +95,8 @@ namespace UnitySimulationX.Viewer.Projection
                 ApplyMissingAssetPlaceholder(target);
             else if (!string.IsNullOrWhiteSpace(snapshot.AssetId))
                 _importedAssetProjectionProvider?.TryApply(snapshot.AssetId, target);
+            else if (TryGetPrimitiveMeshKey(snapshot, out var meshTypeKey))
+                ApplyPrimitiveMesh(target, meshTypeKey);
             ApplyTransform(target.transform, snapshot.Transform);
             ApplyVisibility(target, snapshot.Visible);
             ParentGameObject(target, snapshot.ParentId);
@@ -281,6 +289,38 @@ namespace UnitySimulationX.Viewer.Projection
             var material = new Material(shader);
             material.color = new Color(1f, 0.55f, 0.1f, 1f);
             renderer.sharedMaterial = material;
+        }
+
+        bool TryGetPrimitiveMeshKey(SceneObjectModel snapshot, out string meshTypeKey)
+        {
+            meshTypeKey = null;
+            if (snapshot?.Components == null)
+                return false;
+
+            var component = snapshot.Components.FirstOrDefault(candidate =>
+                string.Equals(candidate.TypeId, PrimitiveMeshComponentTypeId, System.StringComparison.Ordinal));
+            if (component == null)
+                return false;
+
+            if (_componentCodecs != null &&
+                _componentCodecs.TryGet(component.TypeId, out var codec))
+            {
+                var decoded = codec.Decode(component);
+                var property = decoded?.GetType().GetProperty("MeshTypeKey");
+                if (property?.PropertyType == typeof(string))
+                    meshTypeKey = property.GetValue(decoded) as string;
+            }
+
+            if (string.IsNullOrWhiteSpace(meshTypeKey))
+                meshTypeKey = JsonUtility.FromJson<PrimitiveMeshComponentPayload>(component.PayloadJson)?.meshTypeKey;
+
+            return !string.IsNullOrWhiteSpace(meshTypeKey);
+        }
+
+        [System.Serializable]
+        sealed class PrimitiveMeshComponentPayload
+        {
+            public string meshTypeKey;
         }
     }
 }

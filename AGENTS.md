@@ -4,8 +4,9 @@
 
 - Domain-first: `SceneObjectModel` in `SceneModel`, not MonoBehaviours.
 - Register services in `AppBootstrap` via `ServiceLocator`.
-- Cross-module notifications via `EventBus` (`SelectionChangedEvent`, `SceneObjectChangedEvent`, `HierarchyChangedEvent`).
-- Update flow: edit model → `SceneRegistry` → `ISceneObjectMapper` → GameObject.
+- Cross-module notifications via `EventBus` (`SelectionChangedEvent`, `SceneChangedEvent`).
+- Update flow: `ISceneEditService` → `SceneRegistry` → `ISceneProjectionService` → GameObject.
+- `SceneModel` may use Unity value types, but must not own `GameObject`, `MonoBehaviour`, renderer, mesh, shader, or runtime binding logic.
 
 ## Conventions
 

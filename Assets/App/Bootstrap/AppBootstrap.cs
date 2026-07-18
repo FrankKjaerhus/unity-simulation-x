@@ -24,7 +24,7 @@ using UnitySimulationX.Viewer.Tools;
 namespace UnitySimulationX.App
 {
     /// <summary>
-    /// Application entry point. Registration order: domain → mapping → selection → factories → UI.
+    /// Application entry point. Registration order: scene model → editing → adapters → UI.
     /// </summary>
     [DefaultExecutionOrder(-500)]
     public sealed class AppBootstrap : MonoBehaviour
@@ -58,7 +58,17 @@ namespace UnitySimulationX.App
             var importedAssetProjectionProvider = new ImportedAssetProjectionProvider();
             ServiceLocator.Register<IImportedAssetProjectionProvider>(importedAssetProjectionProvider);
 
-            _projection = new SceneProjectionService(root, _registry, importedAssetProjectionProvider);
+            var primitiveMeshCodec = new PrimitiveMeshComponentCodec();
+            var componentCodecRegistry = new SceneComponentCodecRegistry();
+            componentCodecRegistry.Register(primitiveMeshCodec);
+            componentCodecRegistry.Freeze();
+            ServiceLocator.Register(componentCodecRegistry);
+
+            _projection = new SceneProjectionService(
+                root,
+                _registry,
+                importedAssetProjectionProvider,
+                componentCodecRegistry);
             ServiceLocator.Register<ISceneProjectionService>(_projection);
 
             _edits = new SceneEditService(_registry, _projection, eventBus);
@@ -79,12 +89,6 @@ namespace UnitySimulationX.App
             typeDescriptorRegistry.Register(new SceneTypeDescriptor(SceneObjectTypeIds.MissingAsset, "Missing Asset", "!!"));
             typeDescriptorRegistry.Freeze();
             ServiceLocator.Register(typeDescriptorRegistry);
-
-            var primitiveMeshCodec = new PrimitiveMeshComponentCodec();
-            var componentCodecRegistry = new SceneComponentCodecRegistry();
-            componentCodecRegistry.Register(primitiveMeshCodec);
-            componentCodecRegistry.Freeze();
-            ServiceLocator.Register(componentCodecRegistry);
 
             var primitiveFactory = new PrimitiveFactory(_edits, primitiveMeshCodec);
             var sceneObjectFactoryRegistry = new SceneObjectFactoryRegistry();

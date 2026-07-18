@@ -12,7 +12,6 @@ namespace UnitySimulationX.App.ProjectSystem
 
             var placeholder = snapshot.Clone();
             placeholder.TypeId = SceneObjectTypeIds.MissingAsset;
-            placeholder.PrimitiveMeshTypeKey = null;
             return placeholder;
         }
     }

@@ -1,6 +1,8 @@
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using UnitySimulationX.Editing;
+using UnitySimulationX.Import;
 using UnitySimulationX.SceneModel;
 using UnitySimulationX.Viewer.Projection;
 
@@ -8,6 +10,8 @@ namespace UnitySimulationX.Tests.EditMode
 {
     public sealed class SceneProjectionServiceTests
     {
+        static readonly PrimitiveMeshComponentCodec PrimitiveMeshCodec = new();
+
         Transform _sceneRoot;
         SceneRegistry _registry;
         SceneProjectionService _projection;
@@ -18,7 +22,10 @@ namespace UnitySimulationX.Tests.EditMode
             var rootGo = new GameObject("TestSceneRoot");
             _sceneRoot = rootGo.transform;
             _registry = new SceneRegistry();
-            _projection = new SceneProjectionService(_sceneRoot, _registry);
+            var codecs = new SceneComponentCodecRegistry();
+            codecs.Register(PrimitiveMeshCodec);
+            codecs.Freeze();
+            _projection = new SceneProjectionService(_sceneRoot, _registry, componentCodecs: codecs);
         }
 
         [TearDown]
@@ -35,9 +42,9 @@ namespace UnitySimulationX.Tests.EditMode
             {
                 Id = "obj1",
                 Name = "Cube",
-                TypeId = SceneObjectTypeIds.Primitive,
-                PrimitiveMeshTypeKey = "Cube"
+                TypeId = SceneObjectTypeIds.Primitive
             };
+            model.Components.Add(CreatePrimitiveMeshComponent("Cube"));
             _registry.Add(model);
 
             _projection.CreateProjection(model);
@@ -56,9 +63,9 @@ namespace UnitySimulationX.Tests.EditMode
             {
                 Id = "obj2",
                 Name = "Sphere",
-                TypeId = SceneObjectTypeIds.Primitive,
-                PrimitiveMeshTypeKey = "Sphere"
+                TypeId = SceneObjectTypeIds.Primitive
             };
+            model.Components.Add(CreatePrimitiveMeshComponent("Sphere"));
             _registry.Add(model);
             _projection.CreateProjection(model);
             var go = _projection.GetGameObject(model.Id);
@@ -99,9 +106,9 @@ namespace UnitySimulationX.Tests.EditMode
                 Id = "obj3",
                 Name = "Moved",
                 TypeId = SceneObjectTypeIds.Primitive,
-                PrimitiveMeshTypeKey = "Cube",
                 Transform = new TransformData { Position = Vector3.zero }
             };
+            model.Components.Add(CreatePrimitiveMeshComponent("Cube"));
             _registry.Add(model);
             _projection.CreateProjection(model);
             var go = _projection.GetGameObject(model.Id);
@@ -120,9 +127,9 @@ namespace UnitySimulationX.Tests.EditMode
                 Id = "obj5",
                 Name = "Colored",
                 TypeId = SceneObjectTypeIds.Primitive,
-                PrimitiveMeshTypeKey = "Cube",
                 Transform = new TransformData { Position = Vector3.zero }
             };
+            model.Components.Add(CreatePrimitiveMeshComponent("Cube"));
             _registry.Add(model);
             _projection.CreateProjection(model);
             var go = _projection.GetGameObject(model.Id);
@@ -145,9 +152,9 @@ namespace UnitySimulationX.Tests.EditMode
             {
                 Id = "obj4",
                 Name = "Temp",
-                TypeId = SceneObjectTypeIds.Primitive,
-                PrimitiveMeshTypeKey = "Cube"
+                TypeId = SceneObjectTypeIds.Primitive
             };
+            model.Components.Add(CreatePrimitiveMeshComponent("Cube"));
             _registry.Add(model);
             _projection.CreateProjection(model);
 
@@ -162,6 +169,14 @@ namespace UnitySimulationX.Tests.EditMode
             var assembly = typeof(SceneObjectModel).Assembly;
             Assert.IsNull(assembly.GetType("UnitySimulationX.SceneModel.SceneObjectMapper"));
             Assert.IsNull(assembly.GetType("UnitySimulationX.SceneModel.SceneObjectIdComponent"));
+        }
+
+        static SceneComponentData CreatePrimitiveMeshComponent(string meshTypeKey)
+        {
+            return PrimitiveMeshCodec.Encode(new PrimitiveMeshComponent
+            {
+                MeshTypeKey = meshTypeKey
+            });
         }
     }
 }

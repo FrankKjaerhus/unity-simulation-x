@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 using UnitySimulationX.SceneModel;
 
 namespace UnitySimulationX.SceneModel.Serialization
@@ -69,25 +68,10 @@ namespace UnitySimulationX.SceneModel.Serialization
     }
 
     [Serializable]
-    public sealed class RuntimeDocumentData
-    {
-        public List<global::UnitySimulationX.SceneModel.RuntimeBinding> bindings = new();
-    }
-
-    [Serializable]
     public sealed class CameraBookmarkStub
     {
         public string name;
         public float[] position;
         public float[] rotation;
-    }
-
-    [Serializable]
-    public sealed class DiagnosticMarkerStub
-    {
-        public string id;
-        public string targetObjectId;
-        public string severity;
-        public string message;
     }
 }

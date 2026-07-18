@@ -202,8 +202,7 @@ namespace UnitySimulationX.Editing
                 Transform = draft.Transform?.Clone() ?? new TransformData(),
                 Visible = draft.Visible,
                 Material = draft.Material?.Clone() ?? new MaterialDefinition(),
-                AssetId = draft.AssetId,
-                PrimitiveMeshTypeKey = draft.PrimitiveMeshTypeKey
+                AssetId = draft.AssetId
             };
 
             if (draft.Components != null)

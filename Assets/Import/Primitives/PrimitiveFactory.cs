@@ -77,8 +77,7 @@ namespace UnitySimulationX.Import
                     RotationEuler = settings.RotationEuler,
                     Scale = settings.Scale
                 },
-                Material = settings.Material ?? new MaterialDefinition(),
-                PrimitiveMeshTypeKey = meshTypeKey
+                Material = settings.Material ?? new MaterialDefinition()
             };
 
             draft.Components.Add(_primitiveMeshCodec.Encode(new PrimitiveMeshComponent

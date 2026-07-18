@@ -13,7 +13,6 @@ namespace UnitySimulationX.Editing
         public bool Visible { get; set; } = true;
         public MaterialDefinition Material { get; set; } = new();
         public string AssetId { get; set; }
-        public string PrimitiveMeshTypeKey { get; set; }
         public List<SceneComponentData> Components { get; set; } = new();
         public bool SkipProjectionCreate { get; set; }
     }

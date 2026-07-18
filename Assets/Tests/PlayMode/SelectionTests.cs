@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.TestTools;
 using UnitySimulationX.Core;
 using UnitySimulationX.Editing;
+using UnitySimulationX.Import;
 using UnitySimulationX.SceneModel;
 using UnitySimulationX.Viewer.Projection;
 using UnitySimulationX.Viewer.Selection;
@@ -12,6 +13,8 @@ namespace UnitySimulationX.Tests.PlayMode
 {
     public sealed class SelectionTests
     {
+        static readonly PrimitiveMeshComponentCodec PrimitiveMeshCodec = new();
+
         SceneRegistry _registry;
         SelectionService _selection;
         SceneProjectionService _projection;
@@ -26,7 +29,10 @@ namespace UnitySimulationX.Tests.PlayMode
             _eventBus = new EventBus(_ => { });
             _root = new GameObject("SceneRoot");
             _registry = new SceneRegistry();
-            _projection = new SceneProjectionService(_root.transform, _registry);
+            var codecs = new SceneComponentCodecRegistry();
+            codecs.Register(PrimitiveMeshCodec);
+            codecs.Freeze();
+            _projection = new SceneProjectionService(_root.transform, _registry, componentCodecs: codecs);
             _selection = new SelectionService(_registry, _eventBus);
 
             ServiceLocator.Register<ISceneRegistryRead>(_registry);
@@ -39,9 +45,9 @@ namespace UnitySimulationX.Tests.PlayMode
             {
                 Id = "sel1",
                 Name = "Selectable",
-                TypeId = SceneObjectTypeIds.Primitive,
-                PrimitiveMeshTypeKey = "Cube"
+                TypeId = SceneObjectTypeIds.Primitive
             };
+            model.Components.Add(CreatePrimitiveMeshComponent("Cube"));
             _registry.Add(model);
             _projection.CreateProjection(model);
 
@@ -77,9 +83,9 @@ namespace UnitySimulationX.Tests.PlayMode
             {
                 Id = "sel2",
                 Name = "Second",
-                TypeId = SceneObjectTypeIds.Primitive,
-                PrimitiveMeshTypeKey = "Sphere"
+                TypeId = SceneObjectTypeIds.Primitive
             };
+            model2.Components.Add(CreatePrimitiveMeshComponent("Sphere"));
             _registry.Add(model2);
             _projection.CreateProjection(model2);
 
@@ -102,6 +108,14 @@ namespace UnitySimulationX.Tests.PlayMode
             yield return null;
 
             Assert.AreEqual(0, _selection.SelectedObjectIds.Count);
+        }
+
+        static SceneComponentData CreatePrimitiveMeshComponent(string meshTypeKey)
+        {
+            return PrimitiveMeshCodec.Encode(new PrimitiveMeshComponent
+            {
+                MeshTypeKey = meshTypeKey
+            });
         }
     }
 }

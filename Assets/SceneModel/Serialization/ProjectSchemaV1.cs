@@ -12,8 +12,8 @@ namespace UnitySimulationX.SceneModel.Serialization
         public int schemaVersion = 1;
         public ProjectSchemaV1SceneDocumentData scene = new();
         public ViewSettingsData viewSettings = new();
-        public RuntimeDocumentData runtime = new();
-        public List<DiagnosticMarkerStub> diagnostics = new();
+        public ProjectSchemaV1RuntimeDocumentData runtime = new();
+        public List<ProjectSchemaV1DiagnosticMarkerStub> diagnostics = new();
     }
 
     [Serializable]
@@ -34,5 +34,30 @@ namespace UnitySimulationX.SceneModel.Serialization
         public bool visible = true;
         public string primitiveMeshTypeKey;
         public Color baseColor = Color.white;
+    }
+
+    [Serializable]
+    public sealed class ProjectSchemaV1RuntimeDocumentData
+    {
+        public List<ProjectSchemaV1RuntimeBindingStub> bindings = new();
+    }
+
+    [Serializable]
+    public sealed class ProjectSchemaV1RuntimeBindingStub
+    {
+        public string targetObjectId;
+        public string targetProperty;
+        public string sourceName;
+        public string address;
+        public string mode;
+    }
+
+    [Serializable]
+    public sealed class ProjectSchemaV1DiagnosticMarkerStub
+    {
+        public string id;
+        public string targetObjectId;
+        public string severity;
+        public string message;
     }
 }
