@@ -9,11 +9,13 @@ namespace UnitySimulationX.Import
     {
         readonly SceneRegistry _registry;
         readonly ISceneProjectionService _projection;
+        readonly IEventBus _eventBus;
 
-        public PrimitiveFactory(SceneRegistry registry, ISceneProjectionService projection)
+        public PrimitiveFactory(SceneRegistry registry, ISceneProjectionService projection, IEventBus eventBus)
         {
             _registry = registry;
             _projection = projection;
+            _eventBus = eventBus;
         }
 
         public SceneObjectModel CreatePrimitive(PrimitiveMeshType type, PrimitiveSettings settings)
@@ -39,8 +41,8 @@ namespace UnitySimulationX.Import
             _registry.Add(model);
             _projection.CreateProjection(model);
 
-            EventBus.Publish(new HierarchyChangedEvent());
-            EventBus.Publish(new SceneObjectChangedEvent { ObjectId = model.Id, Model = model });
+            _eventBus.Publish(new HierarchyChangedEvent());
+            _eventBus.Publish(new SceneObjectChangedEvent { ObjectId = model.Id, Model = model });
 
             return model;
         }

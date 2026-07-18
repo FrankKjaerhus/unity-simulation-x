@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnitySimulationX.Core;
@@ -16,6 +17,8 @@ namespace UnitySimulationX.Viewer.Selection
 
         bool _isGrabbing;
         IReadOnlyList<string> _selectedIds = System.Array.Empty<string>();
+        IDisposable _selectionSubscription;
+        IDisposable _grabModeSubscription;
 
         void Awake()
         {
@@ -25,8 +28,11 @@ namespace UnitySimulationX.Viewer.Selection
         void OnEnable()
         {
             settings = ViewerSettingsUtility.LoadDefault(settings);
-            EventBus.Subscribe<SelectionChangedEvent>(OnSelectionChanged);
-            EventBus.Subscribe<GrabModeChangedEvent>(OnGrabModeChanged);
+            if (!ServiceLocator.TryResolve<IEventBus>(out var eventBus))
+                return;
+
+            _selectionSubscription = eventBus.Subscribe<SelectionChangedEvent>(OnSelectionChanged);
+            _grabModeSubscription = eventBus.Subscribe<GrabModeChangedEvent>(OnGrabModeChanged);
         }
 
         void Start()
@@ -44,8 +50,10 @@ namespace UnitySimulationX.Viewer.Selection
 
         void OnDisable()
         {
-            EventBus.Unsubscribe<SelectionChangedEvent>(OnSelectionChanged);
-            EventBus.Unsubscribe<GrabModeChangedEvent>(OnGrabModeChanged);
+            _selectionSubscription?.Dispose();
+            _selectionSubscription = null;
+            _grabModeSubscription?.Dispose();
+            _grabModeSubscription = null;
             SelectionOutlineRenderer.Clear();
         }
 

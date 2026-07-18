@@ -14,22 +14,24 @@ namespace UnitySimulationX.Tests.PlayMode
         SceneRegistry _registry;
         SelectionService _selection;
         SceneProjectionService _projection;
+        EventBus _eventBus;
         GameObject _root;
 
         [UnitySetUp]
         public IEnumerator SetUp()
         {
             ServiceLocator.Clear();
-            EventBus.Clear();
 
+            _eventBus = new EventBus(_ => { });
             _root = new GameObject("SceneRoot");
             _registry = new SceneRegistry();
             _projection = new SceneProjectionService(_root.transform, _registry);
-            _selection = new SelectionService(_registry);
+            _selection = new SelectionService(_registry, _eventBus);
 
             ServiceLocator.Register(_registry);
             ServiceLocator.Register<ISceneProjectionService>(_projection);
             ServiceLocator.Register<ISelectionService>(_selection);
+            ServiceLocator.Register<IEventBus>(_eventBus);
 
             var model = new SceneObjectModel
             {
@@ -49,7 +51,6 @@ namespace UnitySimulationX.Tests.PlayMode
         public IEnumerator TearDown()
         {
             ServiceLocator.Clear();
-            EventBus.Clear();
 
             if (_root != null)
                 Object.Destroy(_root);

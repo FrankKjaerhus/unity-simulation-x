@@ -8,11 +8,13 @@ namespace UnitySimulationX.Viewer.Selection
     public sealed class SelectionService : ISelectionService
     {
         readonly SceneRegistry _registry;
+        readonly IEventBus _eventBus;
         readonly List<string> _selected = new();
 
-        public SelectionService(SceneRegistry registry)
+        public SelectionService(SceneRegistry registry, IEventBus eventBus)
         {
             _registry = registry;
+            _eventBus = eventBus;
         }
 
         public IReadOnlyList<string> SelectedObjectIds => _selected;
@@ -50,7 +52,7 @@ namespace UnitySimulationX.Viewer.Selection
 
         void Publish()
         {
-            EventBus.Publish(new SelectionChangedEvent
+            _eventBus.Publish(new SelectionChangedEvent
             {
                 SelectedObjectIds = _selected.ToList()
             });

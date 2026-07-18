@@ -38,7 +38,9 @@ namespace UnitySimulationX.App
         void Awake()
         {
             ServiceLocator.Clear();
-            EventBus.Clear();
+
+            var eventBus = new EventBus(Debug.LogException);
+            ServiceLocator.Register<IEventBus>(eventBus);
 
             _registry = new SceneRegistry();
             ServiceLocator.Register(_registry);
@@ -50,10 +52,10 @@ namespace UnitySimulationX.App
             _projection = new SceneProjectionService(root, _registry);
             ServiceLocator.Register<ISceneProjectionService>(_projection);
 
-            var selection = new SelectionService(_registry);
+            var selection = new SelectionService(_registry, eventBus);
             ServiceLocator.Register<ISelectionService>(selection);
 
-            var primitiveFactory = new PrimitiveFactory(_registry, _projection);
+            var primitiveFactory = new PrimitiveFactory(_registry, _projection, eventBus);
             ServiceLocator.Register<IPrimitiveFactory>(primitiveFactory);
 
             var importerRegistry = new ImporterRegistry();
@@ -61,13 +63,15 @@ namespace UnitySimulationX.App
             importerRegistry.Register(new StlSceneAssetImporter());
             importerRegistry.Register(new GltfSceneAssetImporter());
             ServiceLocator.Register(importerRegistry);
-            ServiceLocator.Register<IImportSceneService>(new ImportSceneService(importerRegistry, _registry, _projection));
+            ServiceLocator.Register<IImportSceneService>(
+                new ImportSceneService(importerRegistry, _registry, _projection, eventBus));
 
-            ServiceLocator.Register<IProjectPersistenceService>(new ProjectPersistenceService(_registry, _projection));
+            ServiceLocator.Register<IProjectPersistenceService>(
+                new ProjectPersistenceService(_registry, _projection, eventBus));
             ServiceLocator.Register<IFileDialogService>(new NativeFileDialogService());
             ServiceLocator.Register<IViewportToolService>(new ViewportToolService());
 
-            _registry.HierarchyChanged += () => EventBus.Publish(new HierarchyChangedEvent());
+            _registry.HierarchyChanged += () => eventBus.Publish(new HierarchyChangedEvent());
 
             EnsureEventSystem();
             EnsureCamera();

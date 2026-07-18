@@ -12,12 +12,18 @@ namespace UnitySimulationX.Import
         readonly ImporterRegistry _importers;
         readonly SceneRegistry _registry;
         readonly ISceneProjectionService _projection;
+        readonly IEventBus _eventBus;
 
-        public ImportSceneService(ImporterRegistry importers, SceneRegistry registry, ISceneProjectionService projection)
+        public ImportSceneService(
+            ImporterRegistry importers,
+            SceneRegistry registry,
+            ISceneProjectionService projection,
+            IEventBus eventBus)
         {
             _importers = importers;
             _registry = registry;
             _projection = projection;
+            _eventBus = eventBus;
         }
 
         public async Task ImportFileAsync(string path)
@@ -51,8 +57,8 @@ namespace UnitySimulationX.Import
             foreach (var warning in result.Warnings)
                 Debug.LogWarning($"Import warning: {warning.Message}");
 
-            EventBus.Publish(new HierarchyChangedEvent());
-            EventBus.Publish(new SceneObjectChangedEvent { ObjectId = result.RootObject.Id, Model = result.RootObject });
+            _eventBus.Publish(new HierarchyChangedEvent());
+            _eventBus.Publish(new SceneObjectChangedEvent { ObjectId = result.RootObject.Id, Model = result.RootObject });
             Debug.Log($"Imported 3D file: {path}");
         }
 

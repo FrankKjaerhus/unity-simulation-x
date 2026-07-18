@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -18,6 +19,9 @@ namespace UnitySimulationX.UI.Properties
         SceneRegistry _registry;
         ISelectionService _selection;
         ISceneProjectionService _projection;
+        IEventBus _eventBus;
+        IDisposable _selectionSubscription;
+        IDisposable _sceneObjectSubscription;
         SceneObjectModel _current;
 
         public PropertiesPanelController(VisualElement root)
@@ -38,17 +42,20 @@ namespace UnitySimulationX.UI.Properties
             _registry = ServiceLocator.Resolve<SceneRegistry>();
             _selection = ServiceLocator.Resolve<ISelectionService>();
             _projection = ServiceLocator.Resolve<ISceneProjectionService>();
+            _eventBus = ServiceLocator.Resolve<IEventBus>();
 
-            EventBus.Subscribe<SelectionChangedEvent>(OnSelectionChanged);
-            EventBus.Subscribe<SceneObjectChangedEvent>(OnSceneObjectChanged);
+            _selectionSubscription = _eventBus.Subscribe<SelectionChangedEvent>(OnSelectionChanged);
+            _sceneObjectSubscription = _eventBus.Subscribe<SceneObjectChangedEvent>(OnSceneObjectChanged);
 
             Refresh();
         }
 
         public void Unbind()
         {
-            EventBus.Unsubscribe<SelectionChangedEvent>(OnSelectionChanged);
-            EventBus.Unsubscribe<SceneObjectChangedEvent>(OnSceneObjectChanged);
+            _selectionSubscription?.Dispose();
+            _selectionSubscription = null;
+            _sceneObjectSubscription?.Dispose();
+            _sceneObjectSubscription = null;
         }
 
         void OnSelectionChanged(SelectionChangedEvent _) => Refresh();
@@ -166,7 +173,7 @@ namespace UnitySimulationX.UI.Properties
             _registry.Update(_current);
             _projection.UpdateProjection(_current);
 
-            EventBus.Publish(new SceneObjectChangedEvent { ObjectId = _current.Id, Model = _current });
+            _eventBus.Publish(new SceneObjectChangedEvent { ObjectId = _current.Id, Model = _current });
         }
     }
 }

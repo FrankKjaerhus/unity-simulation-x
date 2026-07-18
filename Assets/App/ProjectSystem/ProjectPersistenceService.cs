@@ -11,11 +11,16 @@ namespace UnitySimulationX.App.ProjectSystem
     {
         readonly SceneRegistry _registry;
         readonly ISceneProjectionService _projection;
+        readonly IEventBus _eventBus;
 
-        public ProjectPersistenceService(SceneRegistry registry, ISceneProjectionService projection)
+        public ProjectPersistenceService(
+            SceneRegistry registry,
+            ISceneProjectionService projection,
+            IEventBus eventBus)
         {
             _registry = registry;
             _projection = projection;
+            _eventBus = eventBus;
         }
 
         public string CurrentPath { get; private set; }
@@ -42,7 +47,7 @@ namespace UnitySimulationX.App.ProjectSystem
             ProjectSerializer.ApplyDocument(document, _registry, _projection);
             CurrentPath = path;
 
-            EventBus.Publish(new HierarchyChangedEvent());
+            _eventBus.Publish(new HierarchyChangedEvent());
             Debug.Log($"Loaded project: {path}");
         }
     }

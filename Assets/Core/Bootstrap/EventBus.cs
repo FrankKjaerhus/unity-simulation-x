@@ -3,43 +3,66 @@ using System.Collections.Generic;
 
 namespace UnitySimulationX.Core
 {
-    public static class EventBus
+    public sealed class EventBus : IEventBus
     {
-        static readonly Dictionary<Type, List<Delegate>> Subscribers = new();
+        readonly Dictionary<Type, List<Delegate>> _subscribers = new();
+        readonly Action<Exception> _reportSubscriberError;
 
-        public static void Subscribe<T>(Action<T> handler)
+        public EventBus(Action<Exception> reportSubscriberError)
+        {
+            _reportSubscriberError = reportSubscriberError ?? (_ => { });
+        }
+
+        public IDisposable Subscribe<T>(Action<T> handler)
         {
             var type = typeof(T);
-            if (!Subscribers.TryGetValue(type, out var list))
+            if (!_subscribers.TryGetValue(type, out var list))
             {
                 list = new List<Delegate>();
-                Subscribers[type] = list;
+                _subscribers[type] = list;
             }
 
             list.Add(handler);
+            return new Subscription(() =>
+            {
+                if (_subscribers.TryGetValue(type, out var current))
+                    current.Remove(handler);
+            });
         }
 
-        public static void Unsubscribe<T>(Action<T> handler)
+        public void Publish<T>(T message)
         {
-            if (!Subscribers.TryGetValue(typeof(T), out var list))
-                return;
-
-            list.Remove(handler);
-        }
-
-        public static void Publish<T>(T eventData)
-        {
-            if (!Subscribers.TryGetValue(typeof(T), out var list))
+            if (!_subscribers.TryGetValue(typeof(T), out var list))
                 return;
 
             var snapshot = list.ToArray();
             foreach (var handler in snapshot)
             {
-                if (handler is Action<T> action)
-                    action(eventData);
+                if (handler is not Action<T> action)
+                    continue;
+
+                try
+                {
+                    action(message);
+                }
+                catch (Exception ex)
+                {
+                    _reportSubscriberError(ex);
+                }
             }
         }
 
-        public static void Clear() => Subscribers.Clear();
+        sealed class Subscription : IDisposable
+        {
+            Action _dispose;
+
+            public Subscription(Action dispose) => _dispose = dispose;
+
+            public void Dispose()
+            {
+                _dispose?.Invoke();
+                _dispose = null;
+            }
+        }
     }
 }

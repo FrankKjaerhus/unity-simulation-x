@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -22,6 +23,9 @@ namespace UnitySimulationX.UI.Hierarchy
         SceneRegistry _registry;
         ISelectionService _selection;
         ISceneProjectionService _projection;
+        IEventBus _eventBus;
+        IDisposable _selectionSubscription;
+        IDisposable _hierarchySubscription;
         string _filter = string.Empty;
         string _selectedReparentTarget;
         string _draggedObjectId;
@@ -49,6 +53,7 @@ namespace UnitySimulationX.UI.Hierarchy
             _registry = ServiceLocator.Resolve<SceneRegistry>();
             _selection = ServiceLocator.Resolve<ISelectionService>();
             _projection = ServiceLocator.Resolve<ISceneProjectionService>();
+            _eventBus = ServiceLocator.Resolve<IEventBus>();
 
             _searchField?.RegisterValueChangedCallback(evt =>
             {
@@ -59,8 +64,8 @@ namespace UnitySimulationX.UI.Hierarchy
             _reparentButton?.RegisterCallback<ClickEvent>(_ => ApplyReparent());
             _deleteButton?.RegisterCallback<ClickEvent>(_ => DeleteSelected());
 
-            EventBus.Subscribe<SelectionChangedEvent>(OnSelectionChanged);
-            EventBus.Subscribe<HierarchyChangedEvent>(OnHierarchyChanged);
+            _selectionSubscription = _eventBus.Subscribe<SelectionChangedEvent>(OnSelectionChanged);
+            _hierarchySubscription = _eventBus.Subscribe<HierarchyChangedEvent>(OnHierarchyChanged);
             _registry.HierarchyChanged += Rebuild;
 
             Rebuild();
@@ -70,8 +75,10 @@ namespace UnitySimulationX.UI.Hierarchy
         {
             if (_registry != null)
                 _registry.HierarchyChanged -= Rebuild;
-            EventBus.Unsubscribe<SelectionChangedEvent>(OnSelectionChanged);
-            EventBus.Unsubscribe<HierarchyChangedEvent>(OnHierarchyChanged);
+            _selectionSubscription?.Dispose();
+            _selectionSubscription = null;
+            _hierarchySubscription?.Dispose();
+            _hierarchySubscription = null;
         }
 
         void OnSelectionChanged(SelectionChangedEvent _) => Rebuild();
@@ -143,7 +150,7 @@ namespace UnitySimulationX.UI.Hierarchy
                 model.Name = evt.newValue;
                 _registry.Update(model);
                 _projection.UpdateProjection(model);
-                EventBus.Publish(new SceneObjectChangedEvent { ObjectId = model.Id, Model = model });
+                _eventBus.Publish(new SceneObjectChangedEvent { ObjectId = model.Id, Model = model });
             });
 
             var visibilityToggle = new Toggle { value = model.Visible };
@@ -152,7 +159,7 @@ namespace UnitySimulationX.UI.Hierarchy
                 model.Visible = evt.newValue;
                 _registry.Update(model);
                 _projection.UpdateProjection(model);
-                EventBus.Publish(new SceneObjectChangedEvent { ObjectId = model.Id, Model = model });
+                _eventBus.Publish(new SceneObjectChangedEvent { ObjectId = model.Id, Model = model });
             });
 
             if (_selection.IsSelected(model.Id))
@@ -258,8 +265,8 @@ namespace UnitySimulationX.UI.Hierarchy
             if (model != null)
                 _projection.UpdateProjection(model);
 
-            EventBus.Publish(new HierarchyChangedEvent());
-            EventBus.Publish(new SceneObjectChangedEvent { ObjectId = objectId, Model = model });
+            _eventBus.Publish(new HierarchyChangedEvent());
+            _eventBus.Publish(new SceneObjectChangedEvent { ObjectId = objectId, Model = model });
         }
 
         void ClearDragState()
@@ -279,7 +286,7 @@ namespace UnitySimulationX.UI.Hierarchy
             }
 
             _selection.Clear();
-            EventBus.Publish(new HierarchyChangedEvent());
+            _eventBus.Publish(new HierarchyChangedEvent());
             Rebuild();
         }
 

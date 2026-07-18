@@ -23,6 +23,7 @@ namespace UnitySimulationX.Viewer.Gizmos
         }
 
         UnityEngine.Camera _camera;
+        IEventBus _eventBus;
         bool _grabbing;
         bool _suppressSelectionClick;
         Plane _grabPlane;
@@ -44,6 +45,7 @@ namespace UnitySimulationX.Viewer.Gizmos
         void Awake()
         {
             _camera = GetComponent<UnityEngine.Camera>();
+            ServiceLocator.TryResolve<IEventBus>(out _eventBus);
             ServiceLocator.Register<IGrabService>(this);
         }
 
@@ -166,7 +168,7 @@ namespace UnitySimulationX.Viewer.Gizmos
                     if (model == null)
                         continue;
 
-                    EventBus.Publish(new SceneObjectChangedEvent
+                    _eventBus?.Publish(new SceneObjectChangedEvent
                     {
                         ObjectId = model.Id,
                         Model = model
@@ -225,9 +227,9 @@ namespace UnitySimulationX.Viewer.Gizmos
             };
         }
 
-        static void PublishGrabModeChanged(bool isGrabbing)
+        void PublishGrabModeChanged(bool isGrabbing)
         {
-            EventBus.Publish(new GrabModeChangedEvent { IsGrabbing = isGrabbing });
+            _eventBus?.Publish(new GrabModeChangedEvent { IsGrabbing = isGrabbing });
         }
     }
 }
