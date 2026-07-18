@@ -1,5 +1,6 @@
 using System.IO;
 using UnityEngine;
+using System;
 using UnitySimulationX.Core;
 using UnitySimulationX.Editing;
 using UnitySimulationX.SceneModel.Serialization;
@@ -22,7 +23,7 @@ namespace UnitySimulationX.App.ProjectSystem
             if (string.IsNullOrWhiteSpace(path))
                 return;
 
-            var document = ProjectSerializer.CreateDocument(_edits.Registry);
+            var document = ProjectSerializer.CreateDocument(_edits.Registry, Array.Empty<ProjectAssetDocumentData>());
             var json = JsonUtility.ToJson(document, prettyPrint: true);
             File.WriteAllText(path, json);
             CurrentPath = path;
@@ -35,7 +36,7 @@ namespace UnitySimulationX.App.ProjectSystem
                 return;
 
             var json = File.ReadAllText(path);
-            var document = JsonUtility.FromJson<ProjectViewerDocument>(json);
+            var document = ProjectSchemaMigrator.DecodeAndMigrate(json);
             var snapshots = ProjectSerializer.CreateSnapshots(document);
             _edits.ReplaceScene(snapshots);
             CurrentPath = path;

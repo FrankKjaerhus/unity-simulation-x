@@ -8,12 +8,29 @@ namespace UnitySimulationX.SceneModel.Serialization
     [Serializable]
     public sealed class ProjectViewerDocument
     {
-        public string version = "1.0";
-        public int schemaVersion = 1;
+        public int schemaVersion = 2;
+        public ProjectAssetsDocumentData assets = new();
         public SceneDocumentData scene = new();
         public ViewSettingsData viewSettings = new();
-        public RuntimeDocumentData runtime = new();
-        public List<DiagnosticMarkerStub> diagnostics = new();
+    }
+
+    [Serializable]
+    public sealed class ProjectAssetsDocumentData
+    {
+        public List<ProjectAssetDocumentData> imported = new();
+    }
+
+    [Serializable]
+    public sealed class ProjectAssetDocumentData
+    {
+        public string assetId;
+        public string relativePath;
+        public string originalFileName;
+        public string mediaType;
+        public string contentHash;
+        public string importerId;
+        public int importerVersion;
+        public string importSettingsJson;
     }
 
     [Serializable]
@@ -27,14 +44,21 @@ namespace UnitySimulationX.SceneModel.Serialization
     {
         public string id;
         public string name;
-        public string type;
         public string typeId;
         public string parentId;
-        public List<string> childrenIds = new();
         public TransformData transform = new();
         public bool visible = true;
-        public string primitiveMeshTypeKey;
-        public Color baseColor = Color.white;
+        public MaterialDefinition material = new();
+        public string assetId;
+        public List<SceneComponentDocumentData> components = new();
+    }
+
+    [Serializable]
+    public sealed class SceneComponentDocumentData
+    {
+        public string typeId;
+        public int schemaVersion;
+        public string payloadJson;
     }
 
     [Serializable]

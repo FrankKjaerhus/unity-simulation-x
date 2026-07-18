@@ -4,22 +4,26 @@ using System.Linq;
 using UnityEngine;
 using UnitySimulationX.SceneModel;
 using UnitySimulationX.SceneModel.Serialization;
-using UnitySimulationX.Viewer.Projection;
 
 namespace UnitySimulationX.App.ProjectSystem
 {
     public static class ProjectSerializer
     {
-        public static ProjectViewerDocument CreateDocument(ISceneRegistryRead registry)
+        public static ProjectViewerDocument CreateDocument(
+            ISceneRegistryRead registry,
+            IReadOnlyList<ProjectAssetDocumentData> assets)
         {
             var document = new ProjectViewerDocument();
+            if (assets != null)
+                document.assets.imported.AddRange(assets);
+
             foreach (var model in registry.GetAll().OrderBy(m => string.IsNullOrEmpty(m.ParentId) ? 0 : 1))
-                document.scene.objects.Add(ToDocumentData(model, registry));
+                document.scene.objects.Add(ToDocumentData(model));
 
             return document;
         }
 
-        public static List<SceneObjectModel> CreateSnapshots(ProjectViewerDocument document)
+        public static IReadOnlyList<SceneObjectModel> CreateSnapshots(ProjectViewerDocument document)
         {
             var snapshots = new List<SceneObjectModel>();
             if (document?.scene?.objects == null)
@@ -31,68 +35,44 @@ namespace UnitySimulationX.App.ProjectSystem
             return snapshots;
         }
 
-        public static void ApplyDocument(
-            ProjectViewerDocument document,
-            SceneRegistry registry,
-            ISceneProjectionService projection)
+        static SceneObjectDocumentData ToDocumentData(SceneObjectModel model)
         {
-            if (document?.scene?.objects == null)
-                return;
-
-            var existingIds = registry.GetAll().Select(model => model.Id).ToList();
-            foreach (var id in existingIds)
-                projection.RemoveProjection(id);
-
-            foreach (var rootId in registry.RootIds.ToList())
-                registry.Remove(rootId);
-
-            var remaining = document.scene.objects.ToList();
-            var guard = 0;
-
-            while (remaining.Count > 0 && guard++ < document.scene.objects.Count + 1)
-            {
-                var addedAny = false;
-                for (var i = remaining.Count - 1; i >= 0; i--)
-                {
-                    var data = remaining[i];
-                    if (!string.IsNullOrEmpty(data.parentId) && !registry.Contains(data.parentId))
-                        continue;
-
-                    var model = FromDocumentData(data);
-                    registry.Add(model);
-                    projection.CreateProjection(model);
-                    remaining.RemoveAt(i);
-                    addedAny = true;
-                }
-
-                if (!addedAny)
-                    break;
-            }
-
-            foreach (var data in remaining)
-            {
-                data.parentId = null;
-                var model = FromDocumentData(data);
-                registry.Add(model);
-                projection.CreateProjection(model);
-            }
-        }
-
-        static SceneObjectDocumentData ToDocumentData(SceneObjectModel model, ISceneRegistryRead registry)
-        {
-            return new SceneObjectDocumentData
+            var data = new SceneObjectDocumentData
             {
                 id = model.Id,
                 name = model.Name,
                 typeId = model.TypeId.Value,
-                type = model.TypeId.Value,
                 parentId = model.ParentId,
-                childrenIds = registry.GetChildrenIds(model.Id).ToList(),
                 transform = model.Transform?.Clone() ?? new TransformData(),
                 visible = model.Visible,
-                primitiveMeshTypeKey = model.PrimitiveMeshTypeKey,
-                baseColor = model.Material?.BaseColor ?? Color.white
+                material = model.Material?.Clone() ?? new MaterialDefinition(),
+                assetId = model.AssetId
             };
+
+            if (!string.IsNullOrWhiteSpace(model.PrimitiveMeshTypeKey))
+            {
+                data.components.Add(new SceneComponentDocumentData
+                {
+                    typeId = ProjectSchemaMigrator.PrimitiveMeshComponentTypeId,
+                    schemaVersion = 1,
+                    payloadJson = $"{{\"meshTypeKey\":\"{model.PrimitiveMeshTypeKey}\"}}"
+                });
+            }
+
+            if (model.Components != null)
+            {
+                foreach (var component in model.Components)
+                {
+                    data.components.Add(new SceneComponentDocumentData
+                    {
+                        typeId = component.TypeId,
+                        schemaVersion = component.SchemaVersion,
+                        payloadJson = component.PayloadJson
+                    });
+                }
+            }
+
+            return data;
         }
 
         static SceneObjectModel FromDocumentData(SceneObjectDocumentData data)
@@ -101,17 +81,50 @@ namespace UnitySimulationX.App.ProjectSystem
             {
                 Id = string.IsNullOrWhiteSpace(data.id) ? Guid.NewGuid().ToString("N") : data.id,
                 Name = string.IsNullOrWhiteSpace(data.name) ? "Object" : data.name,
-                TypeId = !string.IsNullOrWhiteSpace(data.typeId)
-                    ? new SceneObjectTypeId(data.typeId)
-                    : LegacySceneObjectTypeMigration.FromV1Type(data.type),
+                TypeId = new SceneObjectTypeId(data.typeId),
                 ParentId = data.parentId,
-                Transform = data.transform ?? new TransformData(),
+                Transform = data.transform?.Clone() ?? new TransformData(),
                 Visible = data.visible,
-                PrimitiveMeshTypeKey = data.primitiveMeshTypeKey,
-                Material = new MaterialDefinition { BaseColor = data.baseColor }
+                Material = data.material?.Clone() ?? new MaterialDefinition(),
+                AssetId = data.assetId
             };
 
+            if (data.components == null)
+                return model;
+
+            foreach (var component in data.components)
+            {
+                if (string.Equals(
+                        component.typeId,
+                        ProjectSchemaMigrator.PrimitiveMeshComponentTypeId,
+                        StringComparison.Ordinal))
+                {
+                    model.PrimitiveMeshTypeKey = ExtractPrimitiveMeshTypeKey(component.payloadJson);
+                    continue;
+                }
+
+                model.Components.Add(new SceneComponentData(
+                    component.typeId,
+                    component.schemaVersion,
+                    component.payloadJson));
+            }
+
             return model;
+        }
+
+        static string ExtractPrimitiveMeshTypeKey(string payloadJson)
+        {
+            if (string.IsNullOrWhiteSpace(payloadJson))
+                return null;
+
+            const string marker = "\"meshTypeKey\":\"";
+            var start = payloadJson.IndexOf(marker, StringComparison.Ordinal);
+            if (start < 0)
+                return null;
+
+            start += marker.Length;
+            var end = payloadJson.IndexOf('"', start);
+            return end > start ? payloadJson.Substring(start, end - start) : null;
         }
     }
 }

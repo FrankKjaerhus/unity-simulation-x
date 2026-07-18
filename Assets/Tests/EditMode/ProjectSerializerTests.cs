@@ -1,7 +1,11 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 using UnitySimulationX.App.ProjectSystem;
+using UnitySimulationX.Core;
+using UnitySimulationX.Editing;
 using UnitySimulationX.SceneModel;
+using UnitySimulationX.SceneModel.Serialization;
 using UnitySimulationX.Viewer.Projection;
 
 namespace UnitySimulationX.Tests.EditMode
@@ -9,7 +13,7 @@ namespace UnitySimulationX.Tests.EditMode
     public sealed class ProjectSerializerTests
     {
         [Test]
-        public void ApplyDocument_RebuildsHierarchyAndTransforms()
+        public void CreateSnapshots_RebuildsHierarchyAndTransforms()
         {
             var sourceRegistry = new SceneRegistry();
             var root = new SceneObjectModel
@@ -30,14 +34,16 @@ namespace UnitySimulationX.Tests.EditMode
             sourceRegistry.Add(root);
             sourceRegistry.Add(child);
 
-            var document = ProjectSerializer.CreateDocument(sourceRegistry);
+            var document = ProjectSerializer.CreateDocument(sourceRegistry, new List<ProjectAssetDocumentData>());
             var sceneRoot = new GameObject("SerializerTestRoot");
             var targetRegistry = new SceneRegistry();
             var projection = new SceneProjectionService(sceneRoot.transform, targetRegistry);
+            var eventBus = new EventBus(_ => { });
+            var edits = new SceneEditService(targetRegistry, projection, eventBus);
 
             try
             {
-                ProjectSerializer.ApplyDocument(document, targetRegistry, projection);
+                edits.ReplaceScene(ProjectSerializer.CreateSnapshots(document));
 
                 var loadedChild = targetRegistry.Get("child");
                 Assert.IsNotNull(loadedChild);

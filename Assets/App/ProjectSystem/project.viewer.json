@@ -1,15 +1,13 @@
 {
-  "version": "1.0",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "assets": {
+    "imported": []
+  },
   "scene": {
     "objects": []
   },
   "viewSettings": {
     "activeViewMode": "Perspective3D",
     "cameraBookmarks": []
-  },
-  "runtime": {
-    "bindings": []
-  },
-  "diagnostics": []
+  }
 }
