@@ -1,9 +1,12 @@
+using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
-using UnityEngine;
+using UnitySimulationX.Core;
 using UnitySimulationX.Editing;
 using UnitySimulationX.SceneModel;
-using UnitySimulationX.Viewer.Projection;
+using UnitySimulationX.SceneModel.Serialization;
+using UnityEngine;
 
 namespace UnitySimulationX.Import
 {
@@ -11,143 +14,187 @@ namespace UnitySimulationX.Import
     {
         readonly ImporterRegistry _importers;
         readonly ISceneEditService _edits;
-        readonly ISceneProjectionService _projection;
+        readonly IProjectAssetStore _assetStore;
+        readonly ImportedAssetProjectionProvider _projectionProvider;
+        readonly ImportSettings _settings;
 
         public ImportSceneService(
             ImporterRegistry importers,
             ISceneEditService edits,
-            ISceneProjectionService projection)
+            IProjectAssetStore assetStore,
+            ImportedAssetProjectionProvider projectionProvider,
+            ImportSettings settings = null)
         {
-            _importers = importers;
-            _edits = edits;
-            _projection = projection;
+            _importers = importers ?? throw new ArgumentNullException(nameof(importers));
+            _edits = edits ?? throw new ArgumentNullException(nameof(edits));
+            _assetStore = assetStore ?? throw new ArgumentNullException(nameof(assetStore));
+            _projectionProvider = projectionProvider ?? throw new ArgumentNullException(nameof(projectionProvider));
+            _settings = settings ?? new ImportSettings();
         }
 
-        public async Task ImportFileAsync(string path)
+        public async Task<ImportOperationResult> ImportFileAsync(
+            string path,
+            CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
-                return;
+            {
+                return Failure(
+                    "import.source.missing",
+                    "Import source file does not exist.");
+            }
 
             var importer = _importers.Resolve(path);
             if (importer == null)
             {
-                Debug.LogWarning($"No importer registered for: {path}");
-                return;
+                return Failure(
+                    "import.importer.missing",
+                    $"No importer registered for '{path}'.");
             }
 
-            var result = await importer.ImportAsync(path, new ImportSettings());
-            if (result?.RootObject == null)
-                return;
+            var settings = CloneSettings(_settings);
+            var importSettingsJson = SerializeSettings(settings);
+            ProjectAssetDocumentData entry = null;
 
-            result.RootObject.DomainProperties["SourcePath"] = path;
-
-            var draft = new SceneObjectDraft
+            try
             {
-                Id = result.RootObject.Id,
-                Name = result.RootObject.Name,
-                TypeId = result.RootObject.TypeId,
-                ParentId = result.RootObject.ParentId,
-                Transform = result.RootObject.Transform?.Clone() ?? new TransformData(),
-                Visible = result.RootObject.Visible,
-                Material = result.RootObject.Material?.Clone() ?? new MaterialDefinition(),
-                AssetId = result.RootObject.AssetId,
-                PrimitiveMeshTypeKey = result.RootObject.PrimitiveMeshTypeKey,
-                SkipProjectionCreate = result.ImportedGameObject != null
-            };
+                entry = await _assetStore.ImportExternalFileAsync(
+                    path,
+                    importer.ImporterId,
+                    importer.ImporterVersion,
+                    importSettingsJson,
+                    cancellationToken);
 
-            GameObject root = null;
-            if (result.ImportedGameObject != null)
-            {
-                _projection.RegisterExistingTarget(draft.Id, result.ImportedGameObject);
-                var createResult = _edits.Create(draft);
-                if (!createResult.Succeeded)
+                var projectOwnedPath = _assetStore.Resolve(entry.assetId);
+                var importResult = await importer.ImportAsync(projectOwnedPath, settings, cancellationToken);
+                if (importResult == null)
                 {
-                    _projection.RemoveProjection(draft.Id);
-                    return;
+                    CleanupFailedImport(entry.assetId);
+                    return Failure(
+                        "import.failed",
+                        $"Importer '{importer.ImporterId}' returned no result.");
                 }
 
-                root = result.ImportedGameObject;
-            }
-            else
-            {
-                var createResult = _edits.Create(draft);
+                if (!importResult.Succeeded || importResult.RootObject == null)
+                {
+                    CleanupFailedImport(entry.assetId);
+                    return new ImportOperationResult
+                    {
+                        Succeeded = false,
+                        ErrorCode = importResult.ErrorCode ?? "import.failed",
+                        Message = importResult.Message ?? "Import failed.",
+                        Warnings = importResult.Warnings
+                    };
+                }
+
+                importResult.RootObject.AssetId = entry.assetId;
+                ApplyImportedMaterial(importResult.RootObject, importResult.Materials);
+                _projectionProvider.Store(entry.assetId, importResult);
+
+                var createResult = _edits.Create(importResult.RootObject);
                 if (!createResult.Succeeded)
-                    return;
+                {
+                    CleanupFailedImport(entry.assetId);
+                    return Failure(
+                        createResult.ErrorCode ?? "import.scene-create.failed",
+                        createResult.Message ?? "Imported scene object could not be created.",
+                        importResult.Warnings);
+                }
 
-                root = _projection.GetGameObject(draft.Id);
+                return new ImportOperationResult
+                {
+                    Succeeded = true,
+                    ObjectId = importResult.RootObject.Id,
+                    Warnings = importResult.Warnings
+                };
             }
+            catch (OperationCanceledException)
+            {
+                if (entry != null)
+                    CleanupFailedImport(entry.assetId);
 
-            if (root != null && result.Meshes.Count > 0)
-                ApplyMesh(root, result.Meshes[0], result.Materials.Count > 0 ? result.Materials[0] : null);
+                return Failure("import.cancelled", "Import cancelled.");
+            }
+            catch (Exception ex)
+            {
+                if (entry != null)
+                    CleanupFailedImport(entry.assetId);
 
-            if (root != null)
-                EnsurePickColliders(root);
-
-            foreach (var warning in result.Warnings)
-                Debug.LogWarning($"Import warning: {warning.Message}");
-
-            Debug.Log($"Imported 3D file: {path}");
+                return Failure("import.failed", ex.Message);
+            }
         }
 
-        static void ApplyMesh(GameObject target, ImportedMeshData data, ImportedMaterialData materialData)
+        void CleanupFailedImport(string assetId)
         {
-            if (data?.Vertices == null || data.Vertices.Length == 0 || data.Triangles == null || data.Triangles.Length == 0)
+            _projectionProvider.Remove(assetId);
+            _assetStore.Remove(assetId);
+        }
+
+        static void ApplyImportedMaterial(SceneObjectDraft draft, System.Collections.Generic.IReadOnlyList<ImportedMaterialData> materials)
+        {
+            if (draft == null || materials == null || materials.Count == 0 || materials[0] == null)
                 return;
 
-            var mesh = new Mesh
+            draft.Material ??= new MaterialDefinition();
+            draft.Material.BaseColor = materials[0].BaseColor;
+            draft.Material.Metallic = materials[0].Metallic;
+            draft.Material.Roughness = materials[0].Roughness;
+        }
+
+        static ImportSettings CloneSettings(ImportSettings settings)
+        {
+            return new ImportSettings
             {
-                name = data.Name,
-                indexFormat = data.Vertices.Length > 65535
-                    ? UnityEngine.Rendering.IndexFormat.UInt32
-                    : UnityEngine.Rendering.IndexFormat.UInt16
+                UnitScale = settings.UnitScale,
+                GenerateColliders = settings.GenerateColliders,
+                PreserveHierarchy = settings.PreserveHierarchy,
+                GenerateMaterials = settings.GenerateMaterials,
+                CenterOnImport = settings.CenterOnImport,
+                MaxSourceBytes = settings.MaxSourceBytes,
+                MaxVertices = settings.MaxVertices,
+                MaxIndices = settings.MaxIndices
             };
-
-            mesh.vertices = data.Vertices;
-            mesh.triangles = data.Triangles;
-
-            if (data.Normals != null && data.Normals.Length == data.Vertices.Length)
-                mesh.normals = data.Normals;
-            else
-                mesh.RecalculateNormals();
-
-            if (data.Uvs != null && data.Uvs.Length == data.Vertices.Length)
-                mesh.uv = data.Uvs;
-
-            mesh.RecalculateBounds();
-
-            var filter = target.GetComponent<MeshFilter>() ?? target.AddComponent<MeshFilter>();
-            filter.sharedMesh = mesh;
-
-            var renderer = target.GetComponent<MeshRenderer>() ?? target.AddComponent<MeshRenderer>();
-            renderer.sharedMaterial = CreateMaterial(materialData);
-
-            var collider = target.GetComponent<MeshCollider>() ?? target.AddComponent<MeshCollider>();
-            collider.sharedMesh = mesh;
         }
 
-        static Material CreateMaterial(ImportedMaterialData materialData)
+        static string SerializeSettings(ImportSettings settings)
         {
-            var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-            var material = shader != null ? new Material(shader) : new Material(Shader.Find("Sprites/Default"));
-
-            if (materialData != null)
-                material.color = materialData.BaseColor;
-            else
-                material.color = new Color(0.72f, 0.72f, 0.72f, 1f);
-
-            return material;
-        }
-
-        static void EnsurePickColliders(GameObject root)
-        {
-            foreach (var filter in root.GetComponentsInChildren<MeshFilter>())
+            return JsonUtility.ToJson(new ImportSettingsData
             {
-                if (filter.sharedMesh == null || filter.GetComponent<Collider>() != null)
-                    continue;
+                unitScale = settings.UnitScale,
+                generateColliders = settings.GenerateColliders,
+                preserveHierarchy = settings.PreserveHierarchy,
+                generateMaterials = settings.GenerateMaterials,
+                centerOnImport = settings.CenterOnImport,
+                maxSourceBytes = settings.MaxSourceBytes,
+                maxVertices = settings.MaxVertices,
+                maxIndices = settings.MaxIndices
+            });
+        }
 
-                var collider = filter.gameObject.AddComponent<MeshCollider>();
-                collider.sharedMesh = filter.sharedMesh;
-            }
+        static ImportOperationResult Failure(
+            string code,
+            string message,
+            System.Collections.Generic.IReadOnlyList<ImportWarning> warnings = null)
+        {
+            return new ImportOperationResult
+            {
+                Succeeded = false,
+                ErrorCode = code,
+                Message = message,
+                Warnings = warnings
+            };
+        }
+
+        [Serializable]
+        sealed class ImportSettingsData
+        {
+            public float unitScale = 1f;
+            public bool generateColliders = true;
+            public bool preserveHierarchy = true;
+            public bool generateMaterials = true;
+            public bool centerOnImport;
+            public long maxSourceBytes = 512L * 1024L * 1024L;
+            public int maxVertices = 5_000_000;
+            public int maxIndices = 15_000_000;
         }
     }
 }

@@ -1,16 +1,17 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnitySimulationX.SceneModel;
+using UnitySimulationX.Editing;
 
 namespace UnitySimulationX.Import
 {
     public sealed class ImportResult
     {
-        public SceneObjectModel RootObject { get; set; }
+        public bool Succeeded { get; set; }
+        public string ErrorCode { get; set; }
+        public string Message { get; set; }
+        public SceneObjectDraft RootObject { get; set; }
         public List<ImportedMeshData> Meshes { get; } = new();
         public List<ImportedMaterialData> Materials { get; } = new();
-        public Bounds Bounds { get; set; }
-        public GameObject ImportedGameObject { get; set; }
         public List<ImportWarning> Warnings { get; } = new();
     }
 

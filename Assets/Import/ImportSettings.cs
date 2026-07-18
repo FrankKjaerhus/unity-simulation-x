@@ -7,5 +7,8 @@ namespace UnitySimulationX.Import
         public bool PreserveHierarchy { get; set; } = true;
         public bool GenerateMaterials { get; set; } = true;
         public bool CenterOnImport { get; set; }
+        public long MaxSourceBytes { get; set; } = 512L * 1024L * 1024L;
+        public int MaxVertices { get; set; } = 5_000_000;
+        public int MaxIndices { get; set; } = 15_000_000;
     }
 }

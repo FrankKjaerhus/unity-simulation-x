@@ -10,11 +10,16 @@ namespace UnitySimulationX.Viewer.Projection
         readonly Dictionary<string, GameObject> _gameObjects = new();
         readonly Transform _sceneRoot;
         readonly ISceneRegistryRead _registry;
+        readonly IImportedAssetProjectionProvider _importedAssetProjectionProvider;
 
-        public SceneProjectionService(Transform sceneRoot, ISceneRegistryRead registry)
+        public SceneProjectionService(
+            Transform sceneRoot,
+            ISceneRegistryRead registry,
+            IImportedAssetProjectionProvider importedAssetProjectionProvider = null)
         {
             _sceneRoot = sceneRoot;
             _registry = registry;
+            _importedAssetProjectionProvider = importedAssetProjectionProvider;
         }
 
         public Transform SceneRoot => _sceneRoot;
@@ -31,12 +36,23 @@ namespace UnitySimulationX.Viewer.Projection
             var idComponent = go.AddComponent<SceneObjectIdComponent>();
             idComponent.SceneObjectId = snapshot.Id;
 
-            if (!string.IsNullOrEmpty(snapshot.PrimitiveMeshTypeKey))
+            if (snapshot.TypeId.Equals(SceneObjectTypeIds.MissingAsset))
+            {
+                ApplyMissingAssetPlaceholder(go);
+            }
+            else if (!string.IsNullOrWhiteSpace(snapshot.AssetId))
+            {
+                _importedAssetProjectionProvider?.TryApply(snapshot.AssetId, go);
+            }
+            else if (!string.IsNullOrEmpty(snapshot.PrimitiveMeshTypeKey))
+            {
                 ApplyPrimitiveMesh(go, snapshot.PrimitiveMeshTypeKey);
+            }
 
             ApplyTransform(go.transform, snapshot.Transform);
             ApplyVisibility(go, snapshot.Visible);
-            ApplyMaterial(go, snapshot.Material);
+            if (!snapshot.TypeId.Equals(SceneObjectTypeIds.MissingAsset))
+                ApplyMaterial(go, snapshot.Material);
             ParentGameObject(go, snapshot.ParentId);
 
             _gameObjects[snapshot.Id] = go;
@@ -69,6 +85,10 @@ namespace UnitySimulationX.Viewer.Projection
                 return;
 
             target.name = snapshot.Name ?? snapshot.Id;
+            if (snapshot.TypeId.Equals(SceneObjectTypeIds.MissingAsset))
+                ApplyMissingAssetPlaceholder(target);
+            else if (!string.IsNullOrWhiteSpace(snapshot.AssetId))
+                _importedAssetProjectionProvider?.TryApply(snapshot.AssetId, target);
             ApplyTransform(target.transform, snapshot.Transform);
             ApplyVisibility(target, snapshot.Visible);
             ParentGameObject(target, snapshot.ParentId);
@@ -204,14 +224,18 @@ namespace UnitySimulationX.Viewer.Projection
                 return;
             }
 
-            var meshFilter = go.AddComponent<MeshFilter>();
+            var meshFilter = go.GetComponent<MeshFilter>() ?? go.AddComponent<MeshFilter>();
             meshFilter.sharedMesh = mesh;
-            go.AddComponent<MeshRenderer>();
+            if (go.GetComponent<MeshRenderer>() == null)
+                go.AddComponent<MeshRenderer>();
             AddPickCollider(go, meshTypeKey, mesh);
         }
 
         static void AddPickCollider(GameObject go, string meshTypeKey, Mesh mesh)
         {
+            if (go.GetComponent<Collider>() != null)
+                return;
+
             switch (meshTypeKey)
             {
                 case "Cube":
@@ -240,6 +264,23 @@ namespace UnitySimulationX.Viewer.Projection
                     meshCollider.convex = true;
                     break;
             }
+        }
+
+        static void ApplyMissingAssetPlaceholder(GameObject go)
+        {
+            ApplyPrimitiveMesh(go, "Cube");
+
+            var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            if (shader == null)
+                return;
+
+            var renderer = go.GetComponent<MeshRenderer>();
+            if (renderer == null)
+                return;
+
+            var material = new Material(shader);
+            material.color = new Color(1f, 0.55f, 0.1f, 1f);
+            renderer.sharedMaterial = material;
         }
     }
 }

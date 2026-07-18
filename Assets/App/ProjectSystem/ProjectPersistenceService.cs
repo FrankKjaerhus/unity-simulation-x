@@ -5,6 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnitySimulationX.Core;
 using UnitySimulationX.Editing;
+using UnitySimulationX.Import;
+using UnitySimulationX.SceneModel;
 using UnitySimulationX.SceneModel.Serialization;
 using UnityEngine;
 
@@ -14,15 +16,42 @@ namespace UnitySimulationX.App.ProjectSystem
     {
         readonly ISceneEditService _edits;
         readonly IProjectWorkspace _workspace;
+        readonly IProjectAssetStore _assetStore;
+        readonly ImporterRegistry _importers;
+        readonly ImportedAssetProjectionProvider _importedAssetProjectionProvider;
+        readonly MissingAssetFactory _missingAssetFactory;
         readonly ProjectDocumentValidator _validator;
 
         public ProjectPersistenceService(
             ISceneEditService edits,
             IProjectWorkspace workspace,
             ProjectDocumentValidator validator = null)
+            : this(
+                edits,
+                workspace,
+                new ProjectAssetStore(workspace),
+                CreateDefaultImporters(),
+                new ImportedAssetProjectionProvider(),
+                new MissingAssetFactory(),
+                validator)
+        {
+        }
+
+        public ProjectPersistenceService(
+            ISceneEditService edits,
+            IProjectWorkspace workspace,
+            IProjectAssetStore assetStore,
+            ImporterRegistry importers,
+            ImportedAssetProjectionProvider importedAssetProjectionProvider,
+            MissingAssetFactory missingAssetFactory,
+            ProjectDocumentValidator validator = null)
         {
             _edits = edits ?? throw new ArgumentNullException(nameof(edits));
             _workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
+            _assetStore = assetStore ?? throw new ArgumentNullException(nameof(assetStore));
+            _importers = importers ?? throw new ArgumentNullException(nameof(importers));
+            _importedAssetProjectionProvider = importedAssetProjectionProvider ?? throw new ArgumentNullException(nameof(importedAssetProjectionProvider));
+            _missingAssetFactory = missingAssetFactory ?? throw new ArgumentNullException(nameof(missingAssetFactory));
             _validator = validator ?? new ProjectDocumentValidator();
         }
 
@@ -63,16 +92,29 @@ namespace UnitySimulationX.App.ProjectSystem
                 if (HasErrors(issues))
                     return ResultFromIssues(issues);
 
-                var snapshots = ProjectSerializer.CreateSnapshots(document);
-                var replaceResult = _edits.ReplaceScene(snapshots);
-                if (!replaceResult.Succeeded)
+                var loadPreparation = await BuildLoadPreparationAsync(document, projectRoot, cancellationToken);
+                var previousCache = _importedAssetProjectionProvider.SnapshotCache();
+
+                _importedAssetProjectionProvider.ReplaceCache(loadPreparation.CandidateCache);
+                try
                 {
-                    return Failure(
-                        replaceResult.ErrorCode ?? "project.load.scene-replace.failed",
-                        replaceResult.Message ?? "Scene replacement failed.");
+                    var replaceResult = _edits.ReplaceScene(loadPreparation.Snapshots);
+                    if (!replaceResult.Succeeded)
+                    {
+                        _importedAssetProjectionProvider.ReplaceCache(previousCache);
+                        return Failure(
+                            replaceResult.ErrorCode ?? "project.load.scene-replace.failed",
+                            replaceResult.Message ?? "Scene replacement failed.");
+                    }
+                }
+                catch
+                {
+                    _importedAssetProjectionProvider.ReplaceCache(previousCache);
+                    throw;
                 }
 
                 _workspace.UsePersistentRoot(projectRoot);
+                _assetStore.ReplaceCatalog(document.assets?.imported ?? Array.Empty<ProjectAssetDocumentData>());
                 return ResultFromIssues(issues);
             }
             catch (ProjectFormatException ex)
@@ -97,10 +139,15 @@ namespace UnitySimulationX.App.ProjectSystem
             {
                 var document = ProjectSerializer.CreateDocument(
                     _edits.Registry,
-                    Array.Empty<ProjectAssetDocumentData>());
+                    _assetStore.GetAll());
                 var issues = _validator.Validate(document, projectRoot);
                 if (HasErrors(issues))
                     return ResultFromIssues(issues);
+
+                if (updateWorkspaceRoot)
+                {
+                    await _assetStore.CopyAllToAsync(projectRoot, cancellationToken);
+                }
 
                 var json = JsonUtility.ToJson(document, prettyPrint: true);
                 await ProjectFileWriter.WriteAtomicAsync(
@@ -117,6 +164,103 @@ namespace UnitySimulationX.App.ProjectSystem
             {
                 return Failure("project.save.failed", ex.Message);
             }
+        }
+
+        async Task<LoadPreparation> BuildLoadPreparationAsync(
+            ProjectViewerDocument document,
+            string projectRoot,
+            CancellationToken cancellationToken)
+        {
+            var candidateCache = new Dictionary<string, ImportResult>(StringComparer.Ordinal);
+            var missingAssetIds = new HashSet<string>(StringComparer.Ordinal);
+            var assets = document.assets?.imported ?? new List<ProjectAssetDocumentData>();
+
+            foreach (var asset in assets)
+            {
+                if (asset == null || string.IsNullOrWhiteSpace(asset.assetId))
+                    continue;
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var absolutePath = ProjectPaths.ResolveInsideRoot(projectRoot, asset.relativePath);
+                if (!File.Exists(absolutePath))
+                {
+                    missingAssetIds.Add(asset.assetId);
+                    continue;
+                }
+
+                var importer = _importers.ResolveById(asset.importerId) ?? _importers.Resolve(absolutePath);
+                if (importer == null)
+                {
+                    throw new InvalidOperationException(
+                        $"No importer registered for project asset '{asset.assetId}'.");
+                }
+
+                var importResult = await importer.ImportAsync(
+                    absolutePath,
+                    DecodeImportSettings(asset.importSettingsJson),
+                    cancellationToken);
+                if (importResult == null || !importResult.Succeeded || importResult.RootObject == null)
+                {
+                    throw new InvalidOperationException(
+                        importResult?.Message ??
+                        $"Failed to rebuild imported asset '{asset.assetId}'.");
+                }
+
+                importResult.RootObject.AssetId = asset.assetId;
+                candidateCache[asset.assetId] = importResult;
+            }
+
+            var snapshots = ProjectSerializer.CreateSnapshots(document);
+            var resolvedSnapshots = new List<SceneObjectModel>(snapshots.Count);
+            foreach (var snapshot in snapshots)
+            {
+                if (!string.IsNullOrWhiteSpace(snapshot.AssetId) &&
+                    missingAssetIds.Contains(snapshot.AssetId))
+                {
+                    resolvedSnapshots.Add(_missingAssetFactory.Create(snapshot));
+                }
+                else
+                {
+                    resolvedSnapshots.Add(snapshot);
+                }
+            }
+
+            return new LoadPreparation(resolvedSnapshots, candidateCache);
+        }
+
+        static ImportSettings DecodeImportSettings(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                return new ImportSettings();
+            if (string.Equals(json.Trim(), "{}", StringComparison.Ordinal))
+                return new ImportSettings();
+
+            var data = JsonUtility.FromJson<ImportSettingsData>(json);
+            if (data == null)
+                return new ImportSettings();
+
+            return new ImportSettings
+            {
+                UnitScale = data.unitScale,
+                GenerateColliders = data.generateColliders,
+                PreserveHierarchy = data.preserveHierarchy,
+                GenerateMaterials = data.generateMaterials,
+                CenterOnImport = data.centerOnImport,
+                MaxSourceBytes = data.maxSourceBytes,
+                MaxVertices = data.maxVertices,
+                MaxIndices = data.maxIndices
+            };
+        }
+
+        static ImporterRegistry CreateDefaultImporters()
+        {
+            var registry = new ImporterRegistry();
+            registry.Register(new ObjSceneAssetImporter());
+            registry.Register(new StlSceneAssetImporter());
+            registry.Register(new GltfSceneAssetImporter());
+            registry.Freeze();
+            return registry;
         }
 
         static async Task<string> ReadAllTextAsync(string path, CancellationToken cancellationToken)
@@ -172,6 +316,32 @@ namespace UnitySimulationX.App.ProjectSystem
                     }
                 }
             };
+
+        sealed class LoadPreparation
+        {
+            public LoadPreparation(
+                IReadOnlyList<SceneObjectModel> snapshots,
+                IReadOnlyDictionary<string, ImportResult> candidateCache)
+            {
+                Snapshots = snapshots;
+                CandidateCache = candidateCache;
+            }
+
+            public IReadOnlyList<SceneObjectModel> Snapshots { get; }
+            public IReadOnlyDictionary<string, ImportResult> CandidateCache { get; }
+        }
+
+        [Serializable]
+        sealed class ImportSettingsData
+        {
+            public float unitScale = 1f;
+            public bool generateColliders = true;
+            public bool preserveHierarchy = true;
+            public bool generateMaterials = true;
+            public bool centerOnImport;
+            public long maxSourceBytes = 512L * 1024L * 1024L;
+            public int maxVertices = 5_000_000;
+            public int maxIndices = 15_000_000;
         }
     }
 }

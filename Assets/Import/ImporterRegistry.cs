@@ -42,6 +42,14 @@ namespace UnitySimulationX.Import
             return _orderedImporters.FirstOrDefault(importer => importer.CanImport(extension));
         }
 
+        public ISceneAssetImporter ResolveById(string importerId)
+        {
+            if (string.IsNullOrWhiteSpace(importerId))
+                return null;
+
+            return _importersById.TryGetValue(importerId, out var importer) ? importer : null;
+        }
+
         void EnsureNotFrozen()
         {
             if (_isFrozen)

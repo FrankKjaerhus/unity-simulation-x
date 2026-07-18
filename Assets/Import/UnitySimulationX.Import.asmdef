@@ -4,7 +4,8 @@
     "references": [
         "UnitySimulationX.Core",
         "UnitySimulationX.Editing",
-        "UnitySimulationX.SceneModel"
+        "UnitySimulationX.SceneModel",
+        "UnitySimulationX.Viewer"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

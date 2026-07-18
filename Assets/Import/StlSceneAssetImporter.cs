@@ -2,8 +2,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnitySimulationX.Editing;
 using UnitySimulationX.SceneModel;
 
 namespace UnitySimulationX.Import
@@ -11,30 +13,51 @@ namespace UnitySimulationX.Import
     public sealed class StlSceneAssetImporter : ISceneAssetImporter
     {
         public string ImporterId => "stl";
+        public int ImporterVersion => 1;
         public bool CanImport(string fileExtension) => fileExtension == ".stl";
 
-        public Task<ImportResult> ImportAsync(string filePath, ImportSettings settings)
+        public Task<ImportResult> ImportAsync(
+            string filePath,
+            ImportSettings settings,
+            CancellationToken cancellationToken)
         {
-            var mesh = LooksLikeAsciiStl(filePath)
-                ? ReadAscii(filePath, settings.UnitScale)
-                : ReadBinary(filePath, settings.UnitScale);
+            settings ??= new ImportSettings();
+            cancellationToken.ThrowIfCancellationRequested();
 
-            var result = new ImportResult
+            try
             {
-                RootObject = new SceneObjectModel
+                ValidateSourceSize(filePath, settings);
+
+                var mesh = LooksLikeAsciiStl(filePath)
+                    ? ReadAscii(filePath, settings, cancellationToken)
+                    : ReadBinary(filePath, settings, cancellationToken);
+
+                var result = new ImportResult
                 {
-                    Id = System.Guid.NewGuid().ToString("N"),
-                    Name = Path.GetFileNameWithoutExtension(filePath),
-                    TypeId = SceneObjectTypeIds.ImportedModel
-                },
-                Bounds = CalculateBounds(mesh.Vertices)
-            };
+                    Succeeded = true,
+                    RootObject = new SceneObjectDraft
+                    {
+                        Id = System.Guid.NewGuid().ToString("N"),
+                        Name = Path.GetFileNameWithoutExtension(filePath),
+                        TypeId = SceneObjectTypeIds.ImportedModel
+                    }
+                };
 
-            result.Meshes.Add(mesh);
-            if (mesh.Vertices == null || mesh.Vertices.Length == 0)
-                result.Warnings.Add(new ImportWarning { Message = "STL contained no mesh vertices." });
+                result.Meshes.Add(mesh);
+                if (mesh.Vertices == null || mesh.Vertices.Length == 0)
+                    result.Warnings.Add(new ImportWarning { Message = "STL contained no mesh vertices." });
 
-            return Task.FromResult(result);
+                return Task.FromResult(result);
+            }
+            catch (ImportFailureException ex)
+            {
+                return Task.FromResult(new ImportResult
+                {
+                    Succeeded = false,
+                    ErrorCode = ex.Code,
+                    Message = ex.Message
+                });
+            }
         }
 
         static bool LooksLikeAsciiStl(string filePath)
@@ -47,7 +70,10 @@ namespace UnitySimulationX.Import
             return header.StartsWith("solid") && header.Contains("facet");
         }
 
-        static ImportedMeshData ReadAscii(string filePath, float unitScale)
+        static ImportedMeshData ReadAscii(
+            string filePath,
+            ImportSettings settings,
+            CancellationToken cancellationToken)
         {
             var vertices = new List<Vector3>();
             var normals = new List<Vector3>();
@@ -56,6 +82,8 @@ namespace UnitySimulationX.Import
 
             foreach (var rawLine in File.ReadLines(filePath))
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 var line = rawLine.Trim();
                 var parts = line.Split(' ', System.StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length == 0)
@@ -70,9 +98,10 @@ namespace UnitySimulationX.Import
                 if (parts[0] != "vertex" || parts.Length < 4)
                     continue;
 
-                vertices.Add(new Vector3(Parse(parts[1]), Parse(parts[2]), Parse(parts[3])) * unitScale);
+                vertices.Add(new Vector3(Parse(parts[1]), Parse(parts[2]), Parse(parts[3])) * settings.UnitScale);
                 normals.Add(currentNormal);
                 triangles.Add(vertices.Count - 1);
+                EnsureWithinLimits(vertices.Count, triangles.Count, settings);
             }
 
             return new ImportedMeshData
@@ -84,7 +113,10 @@ namespace UnitySimulationX.Import
             };
         }
 
-        static ImportedMeshData ReadBinary(string filePath, float unitScale)
+        static ImportedMeshData ReadBinary(
+            string filePath,
+            ImportSettings settings,
+            CancellationToken cancellationToken)
         {
             var vertices = new List<Vector3>();
             var normals = new List<Vector3>();
@@ -96,12 +128,15 @@ namespace UnitySimulationX.Import
 
             for (var i = 0; i < triangleCount; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 var normal = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle()).normalized;
                 for (var v = 0; v < 3; v++)
                 {
-                    vertices.Add(new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle()) * unitScale);
+                    vertices.Add(new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle()) * settings.UnitScale);
                     normals.Add(normal);
                     triangles.Add(vertices.Count - 1);
+                    EnsureWithinLimits(vertices.Count, triangles.Count, settings);
                 }
 
                 reader.ReadUInt16();
@@ -116,18 +151,43 @@ namespace UnitySimulationX.Import
             };
         }
 
-        static Bounds CalculateBounds(Vector3[] vertices)
+        static void ValidateSourceSize(string filePath, ImportSettings settings)
         {
-            if (vertices == null || vertices.Length == 0)
-                return new Bounds(Vector3.zero, Vector3.zero);
-
-            var bounds = new Bounds(vertices[0], Vector3.zero);
-            for (var i = 1; i < vertices.Length; i++)
-                bounds.Encapsulate(vertices[i]);
-
-            return bounds;
+            if (new FileInfo(filePath).Length > settings.MaxSourceBytes)
+            {
+                throw new ImportFailureException(
+                    "import.source.too-large",
+                    $"Source file exceeds the import size limit of {settings.MaxSourceBytes} bytes.");
+            }
         }
 
         static float Parse(string value) => float.Parse(value, CultureInfo.InvariantCulture);
+
+        static void EnsureWithinLimits(int vertexCount, int indexCount, ImportSettings settings)
+        {
+            if (vertexCount > settings.MaxVertices)
+            {
+                throw new ImportFailureException(
+                    "import.mesh.vertices.exceeded",
+                    $"Imported mesh exceeded the vertex limit of {settings.MaxVertices}.");
+            }
+
+            if (indexCount > settings.MaxIndices)
+            {
+                throw new ImportFailureException(
+                    "import.mesh.indices.exceeded",
+                    $"Imported mesh exceeded the index limit of {settings.MaxIndices}.");
+            }
+        }
+
+        sealed class ImportFailureException : System.Exception
+        {
+            public ImportFailureException(string code, string message) : base(message)
+            {
+                Code = code;
+            }
+
+            public string Code { get; }
+        }
     }
 }

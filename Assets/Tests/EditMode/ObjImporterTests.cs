@@ -1,4 +1,5 @@
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using UnitySimulationX.Import;
@@ -16,8 +17,9 @@ namespace UnitySimulationX.Tests.EditMode
             try
             {
                 var importer = new ObjSceneAssetImporter();
-                var result = await importer.ImportAsync(path, new ImportSettings());
+                var result = await importer.ImportAsync(path, new ImportSettings(), CancellationToken.None);
 
+                Assert.IsTrue(result.Succeeded);
                 Assert.AreEqual(1, result.Meshes.Count);
                 Assert.AreEqual(3, result.Meshes[0].Vertices.Length);
                 Assert.AreEqual(3, result.Meshes[0].Triangles.Length);

@@ -140,11 +140,32 @@ namespace UnitySimulationX.UI.Shell
 
                 var path = dialogs.OpenImportPath();
                 if (!string.IsNullOrWhiteSpace(path))
-                    await importer.ImportFileAsync(path);
+                {
+                    var result = await importer.ImportFileAsync(path, CancellationToken.None);
+                    LogImportResult(result);
+                }
             }
             catch (Exception ex)
             {
                 Debug.LogError($"Import failed: {ex.Message}");
+            }
+        }
+
+        static void LogImportResult(ImportOperationResult result)
+        {
+            if (result == null)
+            {
+                Debug.LogError("Import failed.");
+                return;
+            }
+
+            var warnings = result.Warnings ?? Array.Empty<ImportWarning>();
+            foreach (var warning in warnings)
+                Debug.LogWarning($"Import warning: {warning.Message}");
+
+            if (!result.Succeeded)
+            {
+                Debug.LogError($"Import failed [{result.ErrorCode}]: {result.Message}");
             }
         }
 

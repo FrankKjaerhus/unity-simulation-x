@@ -37,6 +37,7 @@ namespace UnitySimulationX.App
         SceneProjectionService _projection;
         SceneEditService _edits;
         IProjectWorkspace _projectWorkspace;
+        IProjectAssetStore _projectAssetStore;
         IShellLayoutService _layoutService;
         string _sceneRootModelId;
 
@@ -54,7 +55,10 @@ namespace UnitySimulationX.App
             if (sceneRoot == null)
                 sceneRoot = root;
 
-            _projection = new SceneProjectionService(root, _registry);
+            var importedAssetProjectionProvider = new ImportedAssetProjectionProvider();
+            ServiceLocator.Register<IImportedAssetProjectionProvider>(importedAssetProjectionProvider);
+
+            _projection = new SceneProjectionService(root, _registry, importedAssetProjectionProvider);
             ServiceLocator.Register<ISceneProjectionService>(_projection);
 
             _edits = new SceneEditService(_registry, _projection, eventBus);
@@ -95,13 +99,24 @@ namespace UnitySimulationX.App
             importerRegistry.Register(new GltfSceneAssetImporter());
             importerRegistry.Freeze();
             ServiceLocator.Register(importerRegistry);
-            ServiceLocator.Register<IImportSceneService>(
-                new ImportSceneService(importerRegistry, _edits, _projection));
-
             _projectWorkspace = new ProjectWorkspace();
             ServiceLocator.Register<IProjectWorkspace>(_projectWorkspace);
+            _projectAssetStore = new ProjectAssetStore(_projectWorkspace);
+            ServiceLocator.Register<IProjectAssetStore>(_projectAssetStore);
+            ServiceLocator.Register<IImportSceneService>(
+                new ImportSceneService(
+                    importerRegistry,
+                    _edits,
+                    _projectAssetStore,
+                    importedAssetProjectionProvider));
             ServiceLocator.Register<IProjectPersistenceService>(
-                new ProjectPersistenceService(_edits, _projectWorkspace));
+                new ProjectPersistenceService(
+                    _edits,
+                    _projectWorkspace,
+                    _projectAssetStore,
+                    importerRegistry,
+                    importedAssetProjectionProvider,
+                    new MissingAssetFactory()));
             ServiceLocator.Register<IFileDialogService>(new NativeFileDialogService());
             ServiceLocator.Register<IViewportToolService>(new ViewportToolService());
 
