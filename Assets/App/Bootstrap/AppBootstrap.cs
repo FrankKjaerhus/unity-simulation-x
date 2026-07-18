@@ -10,6 +10,8 @@ using UnitySimulationX.Editing;
 using UnitySimulationX.Import;
 using UnitySimulationX.SceneModel;
 using UnitySimulationX.UI;
+using UnitySimulationX.UI.Hierarchy;
+using UnitySimulationX.UI.Properties;
 using UnitySimulationX.Viewer.Camera;
 using UnitySimulationX.Viewer.Gizmos;
 using UnitySimulationX.Viewer.Grid;
@@ -61,13 +63,37 @@ namespace UnitySimulationX.App
             var selection = new SelectionService(_registry, eventBus);
             ServiceLocator.Register<ISelectionService>(selection);
 
-            var primitiveFactory = new PrimitiveFactory(_edits);
+            var propertyProviderRegistry = new PropertyProviderRegistry();
+            propertyProviderRegistry.Register(new CommonPropertyProvider());
+            propertyProviderRegistry.Freeze();
+            ServiceLocator.Register(propertyProviderRegistry);
+
+            var typeDescriptorRegistry = new SceneTypeDescriptorRegistry();
+            typeDescriptorRegistry.Register(new SceneTypeDescriptor(SceneObjectTypeIds.Group, "Group", "GR"));
+            typeDescriptorRegistry.Register(new SceneTypeDescriptor(SceneObjectTypeIds.Primitive, "Primitive", "PR"));
+            typeDescriptorRegistry.Register(new SceneTypeDescriptor(SceneObjectTypeIds.ImportedModel, "Imported Model", "3D"));
+            typeDescriptorRegistry.Register(new SceneTypeDescriptor(SceneObjectTypeIds.MissingAsset, "Missing Asset", "!!"));
+            typeDescriptorRegistry.Freeze();
+            ServiceLocator.Register(typeDescriptorRegistry);
+
+            var primitiveMeshCodec = new PrimitiveMeshComponentCodec();
+            var componentCodecRegistry = new SceneComponentCodecRegistry();
+            componentCodecRegistry.Register(primitiveMeshCodec);
+            componentCodecRegistry.Freeze();
+            ServiceLocator.Register(componentCodecRegistry);
+
+            var primitiveFactory = new PrimitiveFactory(_edits, primitiveMeshCodec);
+            var sceneObjectFactoryRegistry = new SceneObjectFactoryRegistry();
+            sceneObjectFactoryRegistry.Register(primitiveFactory);
+            sceneObjectFactoryRegistry.Freeze();
+            ServiceLocator.Register(sceneObjectFactoryRegistry);
             ServiceLocator.Register<IPrimitiveFactory>(primitiveFactory);
 
             var importerRegistry = new ImporterRegistry();
             importerRegistry.Register(new ObjSceneAssetImporter());
             importerRegistry.Register(new StlSceneAssetImporter());
             importerRegistry.Register(new GltfSceneAssetImporter());
+            importerRegistry.Freeze();
             ServiceLocator.Register(importerRegistry);
             ServiceLocator.Register<IImportSceneService>(
                 new ImportSceneService(importerRegistry, _edits, _projection));

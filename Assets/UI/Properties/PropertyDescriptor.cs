@@ -1,4 +1,5 @@
 using System;
+using UnitySimulationX.Editing;
 
 namespace UnitySimulationX.UI.Properties
 {
@@ -10,5 +11,6 @@ namespace UnitySimulationX.UI.Properties
         public Type ValueType { get; set; }
         public object Value { get; set; }
         public bool IsReadOnly { get; set; }
+        public Func<object, SceneEditResult> Apply { get; set; }
     }
 }

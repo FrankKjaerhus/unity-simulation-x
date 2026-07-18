@@ -10,6 +10,8 @@ namespace UnitySimulationX.Import
 {
     public sealed class GltfSceneAssetImporter : ISceneAssetImporter
     {
+        public string ImporterId => "gltf";
+
         public bool CanImport(string fileExtension)
         {
             return fileExtension == ".glb" || fileExtension == ".gltf";

@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.UIElements;
 using UnitySimulationX.Core;
-using UnitySimulationX.Import;
+using UnitySimulationX.Editing;
 using UnitySimulationX.UI.Icons;
 using UnitySimulationX.Viewer.Selection;
 using UnitySimulationX.Viewer.Tools;
@@ -14,6 +14,8 @@ namespace UnitySimulationX.UI.Library
         readonly VisualElement _content;
 
         IViewportToolService _toolService;
+        ISceneEditService _edits;
+        SceneObjectFactoryRegistry _factoryRegistry;
 
         public LibraryPanelController(VisualElement root)
         {
@@ -26,6 +28,8 @@ namespace UnitySimulationX.UI.Library
             if (_root == null || _content == null)
                 return;
 
+            _factoryRegistry = ServiceLocator.Resolve<SceneObjectFactoryRegistry>();
+            _edits = ServiceLocator.Resolve<ISceneEditService>();
             BuildPrimitiveTiles();
 
             _toolService = ServiceLocator.Resolve<IViewportToolService>();
@@ -42,20 +46,20 @@ namespace UnitySimulationX.UI.Library
         void BuildPrimitiveTiles()
         {
             _content.Clear();
-            AddTile(PrimitiveMeshType.Cube, MaterialIconNames.Cube);
-            AddTile(PrimitiveMeshType.Cylinder, MaterialIconNames.Cylinder);
-            AddTile(PrimitiveMeshType.Sphere, MaterialIconNames.Sphere);
-            AddTile(PrimitiveMeshType.Capsule, MaterialIconNames.Capsule);
-            AddTile(PrimitiveMeshType.Cone, MaterialIconNames.Cone);
-            AddTile(PrimitiveMeshType.Plane, MaterialIconNames.Plane);
+
+            foreach (var factory in _factoryRegistry.GetFactories())
+            {
+                foreach (var variantId in factory.VariantIds)
+                    AddTile(factory, variantId, GetIconName(variantId));
+            }
         }
 
-        void AddTile(PrimitiveMeshType type, string iconName)
+        void AddTile(ISceneObjectFactory factory, string variantId, string iconName)
         {
-            var tile = new Button(() => CreatePrimitive(type))
+            var tile = new Button(() => CreateObject(factory, variantId))
             {
-                text = $"{iconName}\n{type}",
-                tooltip = $"Insert {type}"
+                text = $"{iconName}\n{variantId}",
+                tooltip = $"Insert {variantId}"
             };
 
             tile.AddToClassList("library-tile");
@@ -67,9 +71,8 @@ namespace UnitySimulationX.UI.Library
             _root.EnableInClassList("library-panel-hidden", tool != ViewportTool.Insert);
         }
 
-        static void CreatePrimitive(PrimitiveMeshType type)
+        void CreateObject(ISceneObjectFactory factory, string variantId)
         {
-            var factory = ServiceLocator.Resolve<IPrimitiveFactory>();
             string parentId = null;
 
             if (ServiceLocator.TryResolve<ISelectionService>(out var selection) &&
@@ -78,19 +81,30 @@ namespace UnitySimulationX.UI.Library
                 parentId = selection.SelectedObjectIds[0];
             }
 
-            var settings = new PrimitiveSettings
-            {
-                Name = type.ToString(),
-                Position = parentId == null
-                    ? new Vector3(Random.Range(-2f, 2f), 0.5f, Random.Range(-2f, 2f))
-                    : Random.insideUnitSphere * 0.5f,
-                ParentId = parentId
-            };
+            var draft = factory.Create(variantId, variantId, parentId);
+            if (draft == null)
+                return;
 
-            var model = factory.CreatePrimitive(type, settings);
+            var result = _edits.Create(draft);
+            if (!result.Succeeded)
+                return;
 
             if (ServiceLocator.TryResolve<ISelectionService>(out var sel))
-                sel.Select(model.Id);
+                sel.Select(draft.Id);
+        }
+
+        static string GetIconName(string variantId)
+        {
+            return variantId switch
+            {
+                "Cube" => MaterialIconNames.Cube,
+                "Cylinder" => MaterialIconNames.Cylinder,
+                "Sphere" => MaterialIconNames.Sphere,
+                "Capsule" => MaterialIconNames.Capsule,
+                "Cone" => MaterialIconNames.Cone,
+                "Plane" => MaterialIconNames.Plane,
+                _ => "category"
+            };
         }
     }
 }

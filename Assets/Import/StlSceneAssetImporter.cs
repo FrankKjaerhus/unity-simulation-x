@@ -10,6 +10,7 @@ namespace UnitySimulationX.Import
 {
     public sealed class StlSceneAssetImporter : ISceneAssetImporter
     {
+        public string ImporterId => "stl";
         public bool CanImport(string fileExtension) => fileExtension == ".stl";
 
         public Task<ImportResult> ImportAsync(string filePath, ImportSettings settings)

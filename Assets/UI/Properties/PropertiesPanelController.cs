@@ -14,12 +14,13 @@ namespace UnitySimulationX.UI.Properties
     {
         readonly VisualElement _root;
         readonly VisualElement _fieldsContainer;
-        readonly List<IPropertyProvider> _providers = new();
 
         ISceneRegistryRead _registry;
         ISelectionService _selection;
         ISceneEditService _edits;
         IEventBus _eventBus;
+        PropertyProviderRegistry _providerRegistry;
+        SceneComponentCodecRegistry _componentCodecRegistry;
         IDisposable _selectionSubscription;
         IDisposable _sceneChangedSubscription;
         SceneObjectModel _current;
@@ -31,7 +32,6 @@ namespace UnitySimulationX.UI.Properties
                 return;
 
             _fieldsContainer = root.Q<VisualElement>("properties-fields") ?? root;
-            _providers.Add(new CommonPropertyProvider());
         }
 
         public void Bind()
@@ -43,6 +43,8 @@ namespace UnitySimulationX.UI.Properties
             _selection = ServiceLocator.Resolve<ISelectionService>();
             _edits = ServiceLocator.Resolve<ISceneEditService>();
             _eventBus = ServiceLocator.Resolve<IEventBus>();
+            _providerRegistry = ServiceLocator.Resolve<PropertyProviderRegistry>();
+            _componentCodecRegistry = ServiceLocator.Resolve<SceneComponentCodecRegistry>();
 
             _selectionSubscription = _eventBus.Subscribe<SelectionChangedEvent>(OnSelectionChanged);
             _sceneChangedSubscription = _eventBus.Subscribe<SceneChangedEvent>(OnSceneChanged);
@@ -88,15 +90,24 @@ namespace UnitySimulationX.UI.Properties
                 return;
             }
 
-            var provider = _providers.FirstOrDefault(p => p.Supports(_current));
-            if (provider == null)
+            var renderedAny = false;
+            foreach (var provider in _providerRegistry.GetProviders(_current))
             {
-                _fieldsContainer.Add(new Label("No property provider"));
-                return;
+                foreach (var descriptor in provider.GetProperties(_current, _edits))
+                {
+                    _fieldsContainer.Add(CreateField(descriptor));
+                    renderedAny = true;
+                }
             }
 
-            foreach (var descriptor in provider.GetProperties(_current))
+            foreach (var descriptor in GetUnknownComponentDescriptors(_current))
+            {
                 _fieldsContainer.Add(CreateField(descriptor));
+                renderedAny = true;
+            }
+
+            if (!renderedAny)
+                _fieldsContainer.Add(new Label("No property provider"));
         }
 
         VisualElement CreateField(PropertyDescriptor descriptor)
@@ -122,14 +133,14 @@ namespace UnitySimulationX.UI.Properties
             {
                 var field = new TextField { value = descriptor.Value as string };
                 field.AddToClassList("editor-field");
-                field.RegisterValueChangedCallback(evt => ApplyChange(descriptor.Key, evt.newValue));
+                field.RegisterValueChangedCallback(evt => ApplyChange(descriptor, evt.newValue));
                 row.Add(field);
             }
             else if (descriptor.ValueType == typeof(bool))
             {
                 var toggle = new Toggle { value = descriptor.Value is bool b && b };
                 toggle.AddToClassList("editor-field");
-                toggle.RegisterValueChangedCallback(evt => ApplyChange(descriptor.Key, evt.newValue));
+                toggle.RegisterValueChangedCallback(evt => ApplyChange(descriptor, evt.newValue));
                 row.Add(toggle);
             }
             else if (descriptor.ValueType == typeof(Vector3))
@@ -137,7 +148,7 @@ namespace UnitySimulationX.UI.Properties
                 var vector = descriptor.Value is Vector3 v ? v : Vector3.zero;
                 var vectorField = new Vector3Field { value = vector };
                 vectorField.AddToClassList("editor-field");
-                vectorField.RegisterValueChangedCallback(evt => ApplyChange(descriptor.Key, evt.newValue));
+                vectorField.RegisterValueChangedCallback(evt => ApplyChange(descriptor, evt.newValue));
                 row.Add(vectorField);
             }
             else
@@ -150,43 +161,36 @@ namespace UnitySimulationX.UI.Properties
             return row;
         }
 
-        void ApplyChange(string key, object value)
+        IEnumerable<PropertyDescriptor> GetUnknownComponentDescriptors(SceneObjectModel snapshot)
         {
-            if (_current == null)
+            if (snapshot?.Components == null)
+                yield break;
+
+            foreach (var component in snapshot.Components)
+            {
+                if (_componentCodecRegistry.TryGet(component.TypeId, out _))
+                    continue;
+
+                yield return new PropertyDescriptor
+                {
+                    Key = $"unknown-component:{component.TypeId}",
+                    DisplayName = "Unknown component",
+                    Category = "Components",
+                    ValueType = typeof(string),
+                    Value = $"{component.TypeId} (schema {component.SchemaVersion})",
+                    IsReadOnly = true
+                };
+            }
+        }
+
+        void ApplyChange(PropertyDescriptor descriptor, object value)
+        {
+            if (descriptor?.Apply == null)
                 return;
 
-            switch (key)
-            {
-                case "name":
-                    _edits.Rename(_current.Id, value as string);
-                    break;
-                case "position":
-                {
-                    var transform = _current.Transform?.Clone() ?? new TransformData();
-                    transform.Position = (Vector3)value;
-                    _edits.SetTransform(_current.Id, transform);
-                    break;
-                }
-                case "rotation":
-                {
-                    var transform = _current.Transform?.Clone() ?? new TransformData();
-                    transform.RotationEuler = (Vector3)value;
-                    _edits.SetTransform(_current.Id, transform);
-                    break;
-                }
-                case "scale":
-                {
-                    var transform = _current.Transform?.Clone() ?? new TransformData();
-                    transform.Scale = (Vector3)value;
-                    _edits.SetTransform(_current.Id, transform);
-                    break;
-                }
-                case "visible":
-                    _edits.SetVisible(_current.Id, (bool)value);
-                    break;
-            }
-
-            _current = _registry.Get(_current.Id);
+            var result = descriptor.Apply(value);
+            if (result != null && !result.Succeeded && !string.IsNullOrWhiteSpace(result.Message))
+                Debug.LogWarning(result.Message);
         }
     }
 }

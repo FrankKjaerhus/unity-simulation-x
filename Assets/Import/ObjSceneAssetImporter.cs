@@ -9,6 +9,7 @@ namespace UnitySimulationX.Import
 {
     public sealed class ObjSceneAssetImporter : ISceneAssetImporter
     {
+        public string ImporterId => "obj";
         public bool CanImport(string fileExtension) => fileExtension == ".obj";
 
         public Task<ImportResult> ImportAsync(string filePath, ImportSettings settings)

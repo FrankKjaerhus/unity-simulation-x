@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnitySimulationX.Import;
 using UnitySimulationX.SceneModel;
 using UnitySimulationX.SceneModel.Serialization;
 
@@ -9,6 +10,8 @@ namespace UnitySimulationX.App.ProjectSystem
 {
     public static class ProjectSerializer
     {
+        static readonly PrimitiveMeshComponentCodec PrimitiveMeshCodec = new();
+
         public static ProjectViewerDocument CreateDocument(
             ISceneRegistryRead registry,
             IReadOnlyList<ProjectAssetDocumentData> assets)
@@ -49,13 +52,14 @@ namespace UnitySimulationX.App.ProjectSystem
                 assetId = model.AssetId
             };
 
-            if (!string.IsNullOrWhiteSpace(model.PrimitiveMeshTypeKey))
+            var primitiveMeshComponent = GetPrimitiveMeshComponentData(model);
+            if (primitiveMeshComponent != null)
             {
                 data.components.Add(new SceneComponentDocumentData
                 {
-                    typeId = ProjectSchemaMigrator.PrimitiveMeshComponentTypeId,
-                    schemaVersion = 1,
-                    payloadJson = $"{{\"meshTypeKey\":\"{model.PrimitiveMeshTypeKey}\"}}"
+                    typeId = primitiveMeshComponent.TypeId,
+                    schemaVersion = primitiveMeshComponent.SchemaVersion,
+                    payloadJson = primitiveMeshComponent.PayloadJson
                 });
             }
 
@@ -63,6 +67,14 @@ namespace UnitySimulationX.App.ProjectSystem
             {
                 foreach (var component in model.Components)
                 {
+                    if (string.Equals(
+                            component.TypeId,
+                            PrimitiveMeshComponentCodec.PrimitiveMeshComponentTypeId,
+                            StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
                     data.components.Add(new SceneComponentDocumentData
                     {
                         typeId = component.TypeId,
@@ -94,37 +106,47 @@ namespace UnitySimulationX.App.ProjectSystem
 
             foreach (var component in data.components)
             {
-                if (string.Equals(
-                        component.typeId,
-                        ProjectSchemaMigrator.PrimitiveMeshComponentTypeId,
-                        StringComparison.Ordinal))
-                {
-                    model.PrimitiveMeshTypeKey = ExtractPrimitiveMeshTypeKey(component.payloadJson);
-                    continue;
-                }
-
-                model.Components.Add(new SceneComponentData(
+                var componentData = new SceneComponentData(
                     component.typeId,
                     component.schemaVersion,
-                    component.payloadJson));
+                    component.payloadJson);
+
+                model.Components.Add(componentData);
+
+                if (string.Equals(
+                        component.typeId,
+                        PrimitiveMeshComponentCodec.PrimitiveMeshComponentTypeId,
+                        StringComparison.Ordinal))
+                {
+                    model.PrimitiveMeshTypeKey =
+                        ((PrimitiveMeshComponent)PrimitiveMeshCodec.Decode(componentData)).MeshTypeKey;
+                }
             }
 
             return model;
         }
 
-        static string ExtractPrimitiveMeshTypeKey(string payloadJson)
+        static SceneComponentData GetPrimitiveMeshComponentData(SceneObjectModel model)
         {
-            if (string.IsNullOrWhiteSpace(payloadJson))
+            if (model?.Components != null)
+            {
+                var existing = model.Components.FirstOrDefault(component =>
+                    string.Equals(
+                        component.TypeId,
+                        PrimitiveMeshComponentCodec.PrimitiveMeshComponentTypeId,
+                        StringComparison.Ordinal));
+
+                if (existing != null)
+                    return existing;
+            }
+
+            if (string.IsNullOrWhiteSpace(model?.PrimitiveMeshTypeKey))
                 return null;
 
-            const string marker = "\"meshTypeKey\":\"";
-            var start = payloadJson.IndexOf(marker, StringComparison.Ordinal);
-            if (start < 0)
-                return null;
-
-            start += marker.Length;
-            var end = payloadJson.IndexOf('"', start);
-            return end > start ? payloadJson.Substring(start, end - start) : null;
+            return PrimitiveMeshCodec.Encode(new PrimitiveMeshComponent
+            {
+                MeshTypeKey = model.PrimitiveMeshTypeKey
+            });
         }
     }
 }

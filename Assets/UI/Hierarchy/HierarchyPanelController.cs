@@ -24,6 +24,7 @@ namespace UnitySimulationX.UI.Hierarchy
         ISelectionService _selection;
         ISceneEditService _edits;
         IEventBus _eventBus;
+        SceneTypeDescriptorRegistry _typeDescriptorRegistry;
         IDisposable _selectionSubscription;
         IDisposable _sceneChangedSubscription;
         string _filter = string.Empty;
@@ -54,6 +55,7 @@ namespace UnitySimulationX.UI.Hierarchy
             _selection = ServiceLocator.Resolve<ISelectionService>();
             _edits = ServiceLocator.Resolve<ISceneEditService>();
             _eventBus = ServiceLocator.Resolve<IEventBus>();
+            _typeDescriptorRegistry = ServiceLocator.Resolve<SceneTypeDescriptorRegistry>();
 
             _searchField?.RegisterValueChangedCallback(evt =>
             {
@@ -257,18 +259,11 @@ namespace UnitySimulationX.UI.Hierarchy
             Rebuild();
         }
 
-        static string GetIcon(SceneObjectTypeId typeId)
+        string GetIcon(SceneObjectTypeId typeId)
         {
-            if (typeId.Equals(SceneObjectTypeIds.Primitive))
-                return "PR";
-            if (typeId.Equals(SceneObjectTypeIds.ImportedModel))
-                return "3D";
-            if (typeId.Equals(SceneObjectTypeIds.Group))
-                return "OB";
-            if (typeId.Equals(SceneObjectTypeIds.MissingAsset))
-                return "??";
-
-            return "OB";
+            return _typeDescriptorRegistry.TryGet(typeId, out var descriptor)
+                ? descriptor.IconText
+                : "OB";
         }
 
         static bool IsInteractiveTarget(IEventHandler target)
